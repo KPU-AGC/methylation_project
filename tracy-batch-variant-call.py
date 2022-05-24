@@ -110,7 +110,7 @@ def move_tracy_files(target_path_arg: pathlib.Path, input_prefix_arg: str, outpu
     """
 
     # suffix list of files produced by tracy assemble
-    tracy_files_suffix_list = ['.align.fa', '.cons.fq', '.json', '.vertical']
+    tracy_files_suffix_list = ['.abif', '.align1', '.align2', '.align3', '.bcf', '.bcf.csi', '.decomp', '.json']
 
     # move each file into the output folder
     for suffix in tracy_files_suffix_list:
@@ -131,8 +131,8 @@ def check_name(path):
     name_split = path.stem.split('_')
     #Determine which filename convention it is
     index = 0
-    for item in name_split: 
-        if len(item) == 2: 
+    for item in name_split:
+        if len(item) == 2:
             index = name_split.index(item)
             break
     #Check if there is primer direction specified
@@ -176,36 +176,34 @@ def main() -> None:
     output_path = target_path.parent.joinpath('tracy-files')
     output_path.mkdir(parents=True, exist_ok=True)
 
-    list_of_samples = []
+    list_of_samples = {}
 
     for sample in target_path.glob('*.ab1'):
-        list_of_samples.append(check_name(sample))
+        if '_'.join(list(check_name(sample).values())) not in list_of_samples:
+            list_of_samples['_'.join(list(check_name(sample).values()))] = []
+        if get_ab1_qc(sample)['trace_score'] >= 30 and get_ab1_qc(sample)['median_PUP_score'] >= 10:
+            list_of_samples['_'.join(list(check_name(sample).values()))].append(sample)
 
-    for sample in (set(['_'.join(list(list_of_samples[i].values())) for i, _ in enumerate(list_of_samples)])):
-        
-        list_of_runs_for_sample = []
-
-        for run in target_path.glob('*.ab1'):
-            if '_'.join(list(check_name(run).values())) == sample:
-                if get_ab1_qc(run)['trace_score'] >= 30 and get_ab1_qc(run)['median_PUP_score'] >= 10:
-                    list_of_runs_for_sample.append(run)
-
+    for sample in list_of_samples:
         best_run = None
         best_trace = 0
-        for run in list_of_runs_for_sample:
+        for run in list_of_samples[sample]:
             if get_ab1_qc(run)['trace_score'] > best_trace:
                 best_run = run
                 best_trace = get_ab1_qc(run)['trace_score']
 
-        if best_run: 
-            run_data = check_name(best_run)
-            run_tracy(
-                primer_id_arg=run_data['primer_id'],
-                sample_id_arg=run_data['sample_id'],
-                reference_fasta_path_arg=args.reference_file_path,
-                ab1_file_path_arg=best_run,
-                peak_ratio_arg=args.pratio,
-                trim_arg=args.trim)
+    if best_run:
+        run_data = check_name(best_run)
+
+        run_tracy(
+            primer_id_arg=f"{run_data['primer_id']}-{run_data['direction']}",
+            sample_id_arg=run_data['sample_id'],
+            reference_fasta_path_arg=args.reference_file_path,
+            ab1_file_path_arg=best_run,
+            peak_ratio_arg=args.pratio,
+            trim_arg=args.trim)
+
+        move_tracy_files(best_run.parent, f"{run_data['sample_id']}_{run_data['primer_id']}-{run_data['direction']}", output_path)
 
 # --------------------------------------------------
 if __name__ == '__main__':

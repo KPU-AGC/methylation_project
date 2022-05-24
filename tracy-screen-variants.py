@@ -325,6 +325,7 @@ class JSON_data():
         # invalid characters not allowed
         # ex: APOM is disallowed
         for allele in variant_alleles:
+            if len(allele) > 1 and not self.all_vars: return False
             for nucleotide in allele:
                 if nucleotide not in ['A', 'T', 'C', 'G']: return False
 
@@ -434,6 +435,8 @@ class JSON_data():
             given the electropherogram is still up for debate. The current system allows for rough inspection
             via the reference sequence at the bottom of the display. This requires further discussion.
         """
+        self.all_vars = all_vars_arg
+        self.qc_flag = qc_flag_arg
 
         for variant_i, variant_value in enumerate(self.get_variants()):
             if (variant_value[7] == 'SNV')  or (all_vars_arg):

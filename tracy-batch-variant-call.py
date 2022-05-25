@@ -119,7 +119,7 @@ def move_tracy_files(target_path_arg: pathlib.Path, input_prefix_arg: str, outpu
 
     # suffix list of files produced by tracy assemble
     tracy_files_suffix_list = ['.abif', '.align1', '.align2', '.align3', '.bcf', '.bcf.csi', '.decomp', '.json']
-    
+
     # move each file into the output folder
     for suffix in tracy_files_suffix_list:
         input_path = target_path_arg.joinpath(f'{input_prefix_arg}{suffix}')
@@ -219,7 +219,7 @@ def main() -> None:
                 trim_arg=args.trim)
 
             #print(f"{run_data['sample_id']}_{run_data['primer_id']}-{run_data['direction']}") 
-            move_tracy_files(best_run.parent, f"{run_data['sample_id']}_{run_data['primer_id']}-{run_data['direction']}", pathlib.Path(args.output))
+            move_tracy_files(pathlib.Path.cwd(), f"{run_data['sample_id']}_{run_data['primer_id']}-{run_data['direction']}", pathlib.Path(args.output))
 
 # --------------------------------------------------
 if __name__ == '__main__':

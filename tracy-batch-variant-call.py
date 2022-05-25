@@ -20,6 +20,7 @@ class Args(NamedTuple):
     target_path: pathlib.Path
     pratio: float
     trim: int
+    output_path: pathlib.Path
 
 # --------------------------------------------------
 def get_args() -> Args:
@@ -51,6 +52,13 @@ def get_args() -> Args:
         help='tracy peak ratio, [0-1]')
 
     parser.add_argument(
+        '-o',
+        '--output',
+        type=pathlib.Path,
+        metavar='path',
+        help='the path of the output')
+
+    parser.add_argument(
         '-t',
         '--trim',
         type=int,
@@ -71,7 +79,7 @@ def get_args() -> Args:
     if not args.target_path.is_dir():
         parser.error('The input must be a directory!')
 
-    return Args(args.reference_file_path, args.target_path, args.pratio, args.trim)
+    return Args(args.reference_file_path, args.target_path, args.pratio, args.trim, args.output_path)
 
 
 def run_tracy(primer_id_arg: str, sample_id_arg: str, reference_fasta_path_arg: pathlib.Path, ab1_file_path_arg: pathlib.Path, peak_ratio_arg: float, trim_arg: int):
@@ -135,6 +143,7 @@ def check_name(path):
         if len(item) == 2:
             index = name_split.index(item)
             break
+        print(item)
     #Check if there is primer direction specified
     primer_info = name_split[1].split('-')
     if len(primer_info) == 3:
@@ -143,7 +152,8 @@ def check_name(path):
         primer_direction = 'F'
     #Store components of filename
     sequence_info = {
-        0:{'sample_id':name_split[2], 'primer_id':'-'.join(primer_info[0:2]),'direction':primer_direction},  
+        0:{'sample_id':name_split[2], 'primer_id':'-'.join(primer_info[0:2]),'direction':primer_direction},
+        1:{''},
         2:{'sample_id':name_split[0], 'primer_id':'-'.join(primer_info[0:2]),'direction':primer_direction},
     }
     return sequence_info[index]
@@ -173,8 +183,8 @@ def main() -> None:
     args = get_args()
     target_path = pathlib.Path.resolve(args.target_path)
 
-    output_path = target_path.parent.joinpath('tracy-files')
-    output_path.mkdir(parents=True, exist_ok=True)
+    #output_path = target_path.parent.joinpath('tracy-files')
+    #output_path.mkdir(parents=True, exist_ok=True)
 
     list_of_samples = {}
 
@@ -192,18 +202,18 @@ def main() -> None:
                 best_run = run
                 best_trace = get_ab1_qc(run)['trace_score']
 
-    if best_run:
-        run_data = check_name(best_run)
+        if best_run:
+            run_data = check_name(best_run)
 
-        run_tracy(
-            primer_id_arg=f"{run_data['primer_id']}-{run_data['direction']}",
-            sample_id_arg=run_data['sample_id'],
-            reference_fasta_path_arg=args.reference_file_path,
-            ab1_file_path_arg=best_run,
-            peak_ratio_arg=args.pratio,
-            trim_arg=args.trim)
+            run_tracy(
+                primer_id_arg=f"{run_data['primer_id']}-{run_data['direction']}",
+                sample_id_arg=run_data['sample_id'],
+                reference_fasta_path_arg=args.reference_file_path,
+                ab1_file_path_arg=best_run,
+                peak_ratio_arg=args.pratio,
+                trim_arg=args.trim)
 
-        move_tracy_files(best_run.parent, f"{run_data['sample_id']}_{run_data['primer_id']}-{run_data['direction']}", output_path)
+            move_tracy_files(best_run.parent, f"{run_data['sample_id']}_{run_data['primer_id']}-{run_data['direction']}", args.output_path)
 
 # --------------------------------------------------
 if __name__ == '__main__':

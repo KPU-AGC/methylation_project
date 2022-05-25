@@ -20,7 +20,7 @@ class Args(NamedTuple):
     target_path: pathlib.Path
     pratio: float
     trim: int
-    output_path: pathlib.Path
+    output: pathlib.Path
 
 # --------------------------------------------------
 def get_args() -> Args:
@@ -79,7 +79,7 @@ def get_args() -> Args:
     if not args.target_path.is_dir():
         parser.error('The input must be a directory!')
 
-    return Args(args.reference_file_path, args.target_path, args.pratio, args.trim, args.output_path)
+    return Args(args.reference_file_path, args.target_path, args.pratio, args.trim, args.output)
 
 
 def run_tracy(primer_id_arg: str, sample_id_arg: str, reference_fasta_path_arg: pathlib.Path, ab1_file_path_arg: pathlib.Path, peak_ratio_arg: float, trim_arg: int):
@@ -213,7 +213,7 @@ def main() -> None:
                 peak_ratio_arg=args.pratio,
                 trim_arg=args.trim)
 
-            move_tracy_files(best_run.parent, f"{run_data['sample_id']}_{run_data['primer_id']}-{run_data['direction']}", pathlib.Path(args.output_path))
+            move_tracy_files(best_run.parent, f"{run_data['sample_id']}_{run_data['primer_id']}-{run_data['direction']}", pathlib.Path(args.output))
 
 # --------------------------------------------------
 if __name__ == '__main__':

@@ -213,7 +213,7 @@ def main() -> None:
                 peak_ratio_arg=args.pratio,
                 trim_arg=args.trim)
 
-            move_tracy_files(best_run.parent, f"{run_data['sample_id']}_{run_data['primer_id']}-{run_data['direction']}", args.output_path)
+            move_tracy_files(best_run.parent, f"{run_data['sample_id']}_{run_data['primer_id']}-{run_data['direction']}", pathlib.Path(args.output_path))
 
 # --------------------------------------------------
 if __name__ == '__main__':

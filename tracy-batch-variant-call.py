@@ -143,7 +143,6 @@ def check_name(path):
         if len(item) == 2:
             index = name_split.index(item)
             break
-        print(item)
     #Check if there is primer direction specified
     primer_info = name_split[1].split('-')
     if len(primer_info) == 3:
@@ -205,6 +204,7 @@ def main() -> None:
         if best_run:
             run_data = check_name(best_run)
 
+
             run_tracy(
                 primer_id_arg=f"{run_data['primer_id']}-{run_data['direction']}",
                 sample_id_arg=run_data['sample_id'],
@@ -213,6 +213,7 @@ def main() -> None:
                 peak_ratio_arg=args.pratio,
                 trim_arg=args.trim)
 
+            #print(f"{run_data['sample_id']}_{run_data['primer_id']}-{run_data['direction']}") 
             move_tracy_files(best_run.parent, f"{run_data['sample_id']}_{run_data['primer_id']}-{run_data['direction']}", pathlib.Path(args.output))
 
 # --------------------------------------------------

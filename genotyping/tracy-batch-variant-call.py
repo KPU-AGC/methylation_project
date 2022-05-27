@@ -135,7 +135,7 @@ def move_tracy_files(target_path_arg: pathlib.Path, input_prefix_arg: str, outpu
 
 def check_name(path):
     """
-    asdfasfd
+    Checks if the name is ok
     """
 
     if not isinstance(path, pathlib.Path): 

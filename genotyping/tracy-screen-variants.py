@@ -28,6 +28,7 @@ from Bio.Seq import Seq
 class Args(NamedTuple):
     """ Command-line arguments """
     target_dir: pathlib.Path
+    output_dir: pathlib.Path
 
     qc_flag: bool
     all_vars: bool
@@ -62,6 +63,14 @@ def get_args() -> Args:
         action='store_true',
         help='include all types of variants')
 
+    parser.add_argument(
+        '--output',
+        dest='output_dir',
+        type=pathlib.Path,
+        default=None,
+        help='output directory'
+    )
+
     group_UX_options = parser.add_argument_group('UX options (to remove bias?)')
 
     group_UX_options.add_argument(
@@ -78,7 +87,7 @@ def get_args() -> Args:
 
     args = parser.parse_args()
 
-    return Args(args.target_dir, args.qc_flag, args.all_vars, args.hide_nuc, args.hide_tracy)
+    return Args(args.target_dir, args.output_dir, args.qc_flag, args.all_vars, args.hide_nuc, args.hide_tracy)
 
 # --------------------------------------------------
 class JSON_data():
@@ -518,11 +527,13 @@ def main() -> None:
     target_path = pathlib.Path.resolve(args.target_dir)
 
     print_instructions()
-
+    if args.output_dir:
+        output_path = args.output_dir
     # create output folder
-    if target_path.is_file(): output_path = target_path.parent.joinpath('tracy-variant-screening')
-    elif target_path.is_dir(): output_path = target_path.joinpath('tracy-variant-screening')
-    output_path.mkdir(parents=True, exist_ok=True)
+    else: 
+        if target_path.is_file(): output_path = target_path.parent.joinpath('tracy-variant-screening')
+        elif target_path.is_dir(): output_path = target_path.joinpath('tracy-variant-screening')
+        output_path.mkdir(parents=True, exist_ok=True)
 
     if target_path.exists() and target_path.is_file():
         print_runtime(f'Performing Tracy screening on {target_path.name}')

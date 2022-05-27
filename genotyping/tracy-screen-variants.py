@@ -238,9 +238,11 @@ class JSON_data():
                 self.JSON_data['basecallPos'][i] = (max(self.orig_JSON_data['pos']) - self.orig_JSON_data['basecallPos'][i])
 
             signalpos = self.JSON_data['basecallPos'][basepos - 1]
-
+        
             rev_com_var = -1
 
+        else:
+            signalpos = self.JSON_data['basecallPos'][basepos]
 
         # plot the channels
         for nuc in self.nucleotide_data:

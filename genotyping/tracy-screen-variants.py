@@ -257,23 +257,27 @@ class JSON_data():
                 # plot the nucleotide text above
                 plt.text(self.JSON_data['basecallPos'][nuc_i], display_params['nucleotide'], nuc_val, horizontalalignment='center', color=nuc_col, clip_on=True).set_in_layout(False)
 
+            '''
+            # highlight variant nucleotide position
+            if reverse_complement: left_offset = 0
+            else: left_offset = 2
+            left_nuc_peak = self.JSON_data['basecallPos'][basepos - left_offset]
+            left_distance = (self.JSON_data['basecallPos'][basepos - left_offset] - self.JSON_data['basecallPos'][basepos - 1])/2
+            left_edge = left_nuc_peak - left_distance
 
-        # highlight variant nucleotide position
-        if reverse_complement: left_offset = 0
-        else: left_offset = 2
-        left_nuc_peak = self.JSON_data['basecallPos'][basepos - left_offset]
-        left_distance = (self.JSON_data['basecallPos'][basepos - left_offset] - self.JSON_data['basecallPos'][basepos - 1])/2
-        left_edge = left_nuc_peak - left_distance
+            if reverse_complement: right_offset = 2
+            else: right_offset = 0
+            right_count = len(tracy_variant_allele) - 1
+            right_nuc_peak = self.JSON_data['basecallPos'][basepos - right_offset - rev_com_var*(right_count)]
+            right_distance = (self.JSON_data['basecallPos'][basepos - right_offset - rev_com_var*(right_count)] -  self.JSON_data['basecallPos'][basepos - 1])/2
+            right_edge = right_nuc_peak - right_distance
+            bar_width = right_edge - left_edge
 
-        if reverse_complement: right_offset = 2
-        else: right_offset = 0
-        right_count = len(tracy_variant_allele) - 1
-        right_nuc_peak = self.JSON_data['basecallPos'][basepos - right_offset - rev_com_var*(right_count)]
-        right_distance = (self.JSON_data['basecallPos'][basepos - right_offset - rev_com_var*(right_count)] -  self.JSON_data['basecallPos'][basepos - 1])/2
-        right_edge = right_nuc_peak - right_distance
-        bar_width = right_edge - left_edge
+            ax.bar(left_edge, display_params['nucleotide']*2, width=bar_width, align='edge', color = 'c', alpha=0.1)
 
-        ax.bar(left_edge, display_params['nucleotide']*2, width=bar_width, align='edge', color = 'c', alpha=0.1)
+        except IndexError:
+            '''
+            ax.bar(signalpos, display_params['nucleotide']*2, width=average_peak_distance, align='center', color = 'c', alpha=0.1)
 
 
         # plot tracy information above

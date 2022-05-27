@@ -473,6 +473,15 @@ class JSON_data():
                 else:
                     pass
 
+def sort_file_names(list_paths):
+    list_dater = []
+    for path in list_paths: 
+        item = path.stem.split('_')
+        item.append(path)
+        list_dater.append(
+            item
+        )
+    return [x[2] for x in sorted(list_dater, key=(lambda x: (x[1], x[0])))]
 
 def print_instructions() -> None:
     """ Print instructions for manual base-calling"""
@@ -546,7 +555,7 @@ def main() -> None:
         print_runtime(f'Finished Tracy screening on {target_path.name}')
 
     if target_path.exists() and target_path.is_dir():
-        for JSON_file in target_path.glob('*.json'):
+        for JSON_file in sort_file_names([JSON_file for JSON_file in target_path.glob('*.json')]):
             print_runtime(f'Performing Tracy screening on {JSON_file.name}')
             query_JSON = JSON_data(JSON_file, output_path, args.hide_nuc, args.hide_tracy)
             query_JSON.screen_variants(args.qc_flag, args.all_vars)

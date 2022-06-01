@@ -241,9 +241,6 @@ class JSON_data():
         
             rev_com_var = -1
 
-        else:
-            signalpos = self.JSON_data['basecallPos'][basepos]
-
         # plot the channels
         for nuc in self.nucleotide_data:
             ax.plot(self.JSON_data[f'peak{nuc}'], color=self.nucleotide_data[nuc]['color'], label=nuc, linewidth=0.8)

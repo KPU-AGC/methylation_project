@@ -66,6 +66,7 @@ def get_args() -> Args:
     if not args.output: 
         args.output = args.target_path.joinpath('output')
         print(args.output)
+        args.output.mkdir()
     
     if args.pratio < 0 or args.pratio > 1:
         parser.error('Peak ratio must be between 0 and 1.')

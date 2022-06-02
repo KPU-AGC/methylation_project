@@ -189,16 +189,19 @@ def abi_trim(ab1_file_path):
     return left_trim, right_trim
 
 
-def output_summary(output_path, best_runs, failed_runs): 
+def output_summary(output_path, best_runs, failed_runs, sample_info): 
     csv_output_path = output_path.joinpath("ab1_summary.csv")
     csv_file = open(csv_output_path, 'w')
     csv_writer = csv.writer(csv_file, delimiter=',')
-    csv_writer.writerow('Best runs')
+    csv_writer.writerow(('Best runs'))
     csv_writer.writerow(('Sample', 'Trace score', 'Median PUP, Left Trim, Right Trim'))
     csv_writer.writerows(best_runs)
-    csv_writer.writerow('Failed runs')
+    csv_writer.writerow(('Failed runs'))
     csv_writer.writerow(('Sample', 'Trace score', 'Median PUP'))
     csv_writer.writerows(failed_runs)
+    csv_writer.writerow(('Samples and Genes'))
+    csv_writer.writerow(('Sample', 'Primer', 'Direction'))
+    csv_writer.writerows(sample_info)
     csv_file.close()
 
 
@@ -257,7 +260,11 @@ def main() -> None:
             if (args.output.stem == 'output'):
                 move_tracy_files(pathlib.Path.cwd(), f"{run_name['sample_id']}_{run_name['primer_id']}-{run_name['direction']}", pathlib.Path(args.output))
 
-    output_summary(args.output, best_run_samples, failed_samples)
+    #Create a summary
+    sample_metadata = []
+    for key in list_of_samples.keys(): 
+        sample_metadata.append(key.split('_'))
+    output_summary(args.output, best_run_samples, failed_samples, sample_metadata)
 # --------------------------------------------------
 if __name__ == '__main__':
     main()

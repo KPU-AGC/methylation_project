@@ -12,6 +12,7 @@ import time
 import subprocess
 import pathlib
 import shutil
+import csv
 from Bio import SeqIO
 
 class Args(NamedTuple):
@@ -66,7 +67,7 @@ def get_args() -> Args:
     if not args.output: 
         args.output = args.target_path.joinpath('output')
         print(args.output)
-        args.output.mkdir()
+        args.output.mkdir(exist_ok=True)
     
     if args.pratio < 0 or args.pratio > 1:
         parser.error('Peak ratio must be between 0 and 1.')
@@ -187,6 +188,20 @@ def abi_trim(ab1_file_path):
     right_trim = len(untrimmed.seq) - len(trimmed) - left_trim
     return left_trim, right_trim
 
+
+def output_summary(output_path, best_runs, failed_runs): 
+    csv_output_path = output_path.joinpath("ab1_summary.csv")
+    csv_file = open(csv_output_path, 'w')
+    csv_writer = open(csv_file, delimiter=',')
+    csv_writer.writerow('Best runs')
+    csv_writer.writerow(('Sample', 'Trace score', 'Median PUP'))
+    csv_writer.writerows(best_runs)
+    csv_writer.writerow('Failed runs')
+    csv_writer.writerow(('Sample', 'Trace score', 'Median PUP'))
+    csv_writer.writerows(failed_runs)
+    csv_file.close()
+
+
 # --------------------------------------------------
 def main() -> None:
     """ Perform the function """
@@ -198,27 +213,37 @@ def main() -> None:
     #output_path.mkdir(parents=True, exist_ok=True)
 
     list_of_samples = {}
+    failed_samples = []
+    best_run_samples = []
 
     #Organize the ab1 files
     #List of unique groups containing sequences for a particular sample and primer
     for sample in target_path.glob('*.ab1'):
         if '_'.join(list(check_name(sample).values())) not in list_of_samples:
             list_of_samples['_'.join(list(check_name(sample).values()))] = []
-        if get_ab1_qc(sample)['trace_score'] >= 30 and get_ab1_qc(sample)['median_PUP_score'] >= 10:
+
+        scores = get_ab1_qc(sample)
+
+        if scores['trace_score'] >= 30 and scores['median_PUP_score'] >= 10:
             list_of_samples['_'.join(list(check_name(sample).values()))].append(sample)
+        else: 
+            failed_samples.append((sample.name, scores['trace_score'], scores['median_PUP_score']))
 
     #Identify the sequence with the best trace score
     for sample in list_of_samples:
         best_run = None
         best_trace = 0
         for run in list_of_samples[sample]:
-            if get_ab1_qc(run)['trace_score'] > best_trace:
+            scores = get_ab1_qc(run)
+            if scores['trace_score'] > best_trace:
                 best_run = run
-                best_trace = get_ab1_qc(run)['trace_score']
+                best_trace = scores['trace_score']
+                best_pup = scores['median_PUP_score']
 
         if best_run:
             run_name = check_name(best_run)
             left_trim, right_trim = abi_trim(best_run)
+            best_run_samples.append((run.name, best_trace, best_pup))
 
             run_tracy(
                 primer_id_arg=f"{run_name['primer_id']}-{run_name['direction']}",
@@ -231,7 +256,8 @@ def main() -> None:
 
             if (args.output.stem == 'output'):
                 move_tracy_files(pathlib.Path.cwd(), f"{run_name['sample_id']}_{run_name['primer_id']}-{run_name['direction']}", pathlib.Path(args.output))
-
+                
+    output_summary(args.output, best_run_samples, failed_samples)
 # --------------------------------------------------
 if __name__ == '__main__':
     main()

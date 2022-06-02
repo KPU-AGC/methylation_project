@@ -229,7 +229,7 @@ def main() -> None:
                 trim_left=left_trim,
                 trim_right=right_trim)
 
-            if not (args.output.stem == 'output'):
+            if (args.output.stem == 'output'):
                 move_tracy_files(pathlib.Path.cwd(), f"{run_name['sample_id']}_{run_name['primer_id']}-{run_name['direction']}", pathlib.Path(args.output))
 
 # --------------------------------------------------

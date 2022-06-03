@@ -65,7 +65,7 @@ def main():
                 variant[6] in ('PASS','MANUAL')
                 or filter_flag is True
             ):
-                variant[2] = primer_name
+                variant[2] = sample_name + '_' + primer_name
                 csv_writer.writerow(variant)
         json_file.close()
     csv_file.close()

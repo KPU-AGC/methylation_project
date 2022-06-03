@@ -148,7 +148,7 @@ class JSON_data():
     def __repr__(self) -> str:
         return f'<JSON data for: {self.sample_name}>'
 
-
+    #WORKING
     def get_variants(self) -> list:
         """
         Returns a list of list of variants in the JSON data.
@@ -161,7 +161,7 @@ class JSON_data():
         """
         return self.JSON_data['variants']['rows']
 
-
+    #WORKING
     def display_peaks(self, variant_value_arg: list, nuc_flank: int = 5) -> None:
         """
         Display the peaks of a given position using matplotlib graph.
@@ -326,6 +326,10 @@ class JSON_data():
         if variant_allele_arg == '*':
             return 'SKIP_ERROR'
 
+        # if ^ was entered, flag as trim error
+        if variant_allele_arg == '^': 
+            return 'TRIM_ERROR'
+
         # ex: deal with A/ or /A or A cases and return as just [A]
         variant_alleles = variant_allele_arg.upper().split('/')
         if '' in variant_alleles: variant_alleles.remove('')
@@ -349,6 +353,8 @@ class JSON_data():
         # allowed, return alleles
         if len(variant_alleles) == 2:
             return [variant_alleles[0], variant_alleles[1]]
+        
+        #BLANKET RETURN???? WHY?
         return variant_alleles
 
 
@@ -367,44 +373,38 @@ class JSON_data():
         --------------------------------------------------
         Update types:
             PASS: the screening passed tests, update directly
+            SKIP: the variant was skipped. No update. Analogous to passing the same ALT call as the Tracy ALT call
             SKIP_ERROR: the screening was unsuccessful, flag for resequencing
+            TRIM_ERROR: the variant is present in a region that should be trimmed, flag for future reference
         """
-
-        # deal with the * sequence flag
-        if update_type == 'SKIP_ERROR':
-            self.JSON_data['variants']['rows'][variant_i_arg][4] = '*'
-            self.JSON_data['variants']['rows'][variant_i_arg][5] = '-'
-            self.JSON_data['variants']['rows'][variant_i_arg][6] = 'ERR_SCREENED'
-            self.JSON_data['variants']['rows'][variant_i_arg][7] = '-'
-            self.JSON_data['variants']['rows'][variant_i_arg][8] = '-'
-            prettied_json =  pprint.pformat(self.JSON_data, compact=False, sort_dicts=False).replace("'", '"')
-            with open(self.output_path.joinpath(f'{self.sample_name}_s.json'), 'w') as new_JSON:
-                new_JSON.write(prettied_json)
-            return None
-
-        # handle heterozygous input
-        if isinstance(variant_nucleotide_arg, list):
+        # handle heterozygous input by removing the reference allele from the alt allele
+        if len(variant_nucleotide_arg) == 1: 
+            genotype='hom. ALT'
+        else:
             genotype='het.'
             for allele in variant_nucleotide_arg:
                 if allele == self.JSON_data['variants']['rows'][variant_i_arg][3]:
                     variant_nucleotide_arg.remove(allele)
-        else:
-            genotype='hom. ALT'
+                    break
 
         # update JSON data
-        if variant_nucleotide_arg:
+        # column 5 is QUAL
+        if (
+            update_type == 'PASS'
+            and not (variant_nucleotide_arg[0] == self.JSON_data['variants']['rows'][variant_i_arg][4])
+            ):
             self.JSON_data['variants']['rows'][variant_i_arg][4] = variant_nucleotide_arg[0]
-            self.JSON_data['variants']['rows'][variant_i_arg][6] = 'SCREENED'
-        else:
+            self.JSON_data['variants']['rows'][variant_i_arg][6] = 'MANUAL'
+        elif (
+            update_type == 'SKIP_ERROR'
+            or update_type == 'TRIM_ERROR'
+            ):
+            #Replace the ALT call with the REF call
+            #This is because the ALT call is no longer valid
             self.JSON_data['variants']['rows'][variant_i_arg][4] = self.JSON_data['variants']['rows'][variant_i_arg][3]
-            self.JSON_data['variants']['rows'][variant_i_arg][6] = 'ERR_SCREENED'
+            self.JSON_data['variants']['rows'][variant_i_arg][6] = update_type
         self.JSON_data['variants']['rows'][variant_i_arg][5] = '-'
         self.JSON_data['variants']['rows'][variant_i_arg][8] = genotype
-
-        # write to screened JSON file
-        prettied_json =  pprint.pformat(self.JSON_data, compact=False, sort_dicts=False).replace("'", '"')
-        with open(self.output_path.joinpath(f'{self.sample_name[:-4]}_s.json'), 'w') as new_JSON:
-            new_JSON.write(prettied_json)
 
 
     def translate_variant(self, variant_value_arg: list) -> str:
@@ -428,7 +428,6 @@ class JSON_data():
             return f'{variant_value_arg[3]}/{variant_value_arg[4]}'
         elif variant_value_arg[8][:4] == 'hom.':
             return f'{variant_value_arg[4]}/{variant_value_arg[4]}'
-
 
     def screen_variants(self, qc_flag_arg: bool, all_vars_arg: bool) -> None:
         """
@@ -472,6 +471,55 @@ class JSON_data():
                 else:
                     pass
 
+    def screen_variants_new(self, qc_flag_arg: bool, all_vars_arg: bool) -> None:
+        """
+        Main function for screening variants.
+
+        Parameters:
+            qc_flag_arg (bool): If True, also show LowQual variants
+            all_vars_arg (bool): If True, show every kind of variant for screening, more info below
+
+        Returns:
+            None
+
+        --------------------------------------------------
+        all_vars_arg:
+            Only SNV are shown unless the all_vars_arg flag is show. The validity of discerning indels
+            given the electropherogram is still up for debate. The current system allows for rough inspection
+            via the reference sequence at the bottom of the display. This requires further discussion.
+        """
+        self.all_vars = all_vars_arg
+        self.qc_flag = qc_flag_arg
+        variants_screened = False
+
+        for variant_i, variant_value in enumerate(self.get_variants()):
+            #Proceed only if the SNP is a SNP and passes Tracy's quality check
+            #Unless all_vars_arg or qc_flag_arg are active, respectively
+            if (
+                ((variant_value[7] == 'SNV') or all_vars_arg)
+                and ((variant_value[6] == 'PASS') or (variant_value[6] == 'LowQual' and qc_flag_arg))
+            ):
+                variants_screened = True
+                self.display_peaks(variant_value)
+                check_validated = False
+                while not check_validated:
+                    plt.draw()
+                    if not self.hide_tracy_arg: input_nucleotide = input(f'{variant_value[9]} {variant_value[7]} ({self.translate_variant(variant_value)}): ')
+                    else: input_nucleotide = input(f'{variant_value[9]}: ')
+                    if input_nucleotide == 'i': print_instructions()
+                    check_validated = self.validate_nucleotide_arg(input_nucleotide)
+                    if not check_validated: print('Enter a valid nucleotide.')
+                if isinstance(check_validated, str): 
+                    self.update_variant(variant_i, self.validate_nucleotide_arg(input_nucleotide), update_type=check_validated)
+                else:
+                    self.update_variant(variant_i, self.validate_nucleotide_arg(input_nucleotide), update_type='PASS')
+        # write to screened JSON file
+        prettied_json =  pprint.pformat(self.JSON_data, compact=True, sort_dicts=False, width=160).replace("'", '"')
+        with open(self.output_path.joinpath(f'{self.sample_name[:-4]}_s.json'), 'w') as new_JSON:
+            new_JSON.write(prettied_json)
+        if variants_screened is False: 
+            input('No eligible variants. Press enter to continue...')
+
 def sort_file_names(list_paths):
     list_dater = []
     for path in list_paths: 
@@ -495,7 +543,8 @@ def print_instructions() -> None:
     Examples:
         a/a = homozygous A
         a/t = heterozygous A/T
-        *   = ambiguous, impossible to call
+        *   = ambiguous, impossible to call, mark to resequence
+        ^   = variant in region that should be trimmed, mark for future reference
 
     Press enter without entering a nucleotide to skip this position.
     Enter 'i' to bring up these instructions again.
@@ -516,7 +565,7 @@ def generate_reseq_list(output_path_arg: pathlib.Path) -> None:
         with open(JSON_file, 'r') as input_JSON:
             query_JSON_data = json.load(input_JSON)
             for variant_data in query_JSON_data['variants']['rows']:
-                if variant_data[4] == '*': resequencing_list.append(JSON_file.stem)
+                if variant_data[6] == 'SKIP_ERROR': resequencing_list.append(JSON_file.stem)
 
     resequencing_list = sorted(set(resequencing_list))
     with open(output_path_arg.joinpath('reseq_report.txt'), 'w', encoding='UTF-8') as text_file:
@@ -550,14 +599,14 @@ def main() -> None:
     if target_path.exists() and target_path.is_file():
         print_runtime(f'Performing Tracy screening on {target_path.name}')
         query_JSON = JSON_data(target_path, output_path, args.hide_nuc, args.hide_tracy)
-        query_JSON.screen_variants(args.qc_flag, args.all_vars)
+        query_JSON.screen_variants_new(args.qc_flag, args.all_vars)
         print_runtime(f'Finished Tracy screening on {target_path.name}')
 
     if target_path.exists() and target_path.is_dir():
         for JSON_file in sort_file_names([JSON_file for JSON_file in target_path.glob('*.json')]):
             print_runtime(f'Performing Tracy screening on {JSON_file.name}')
             query_JSON = JSON_data(JSON_file, output_path, args.hide_nuc, args.hide_tracy)
-            query_JSON.screen_variants(args.qc_flag, args.all_vars)
+            query_JSON.screen_variants_new(args.qc_flag, args.all_vars)
 
     if target_path.is_dir():
         generate_reseq_list(output_path)

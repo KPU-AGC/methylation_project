@@ -377,24 +377,21 @@ class JSON_data():
             SKIP_ERROR: the screening was unsuccessful, flag for resequencing
             TRIM_ERROR: the variant is present in a region that should be trimmed, flag for future reference
         """
-        # handle heterozygous input by removing the reference allele from the alt allele
-        if len(variant_nucleotide_arg) == 1: 
-            genotype='hom. ALT'
-        else:
-            genotype='het.'
-            for allele in variant_nucleotide_arg:
-                if allele == self.JSON_data['variants']['rows'][variant_i_arg][3]:
-                    variant_nucleotide_arg.remove(allele)
-                    break
-
-        # update JSON data
-        # column 5 is QUAL
-        if (
-            update_type == 'PASS'
-            and not (variant_nucleotide_arg[0] == self.JSON_data['variants']['rows'][variant_i_arg][4])
-            ):
-            self.JSON_data['variants']['rows'][variant_i_arg][4] = variant_nucleotide_arg[0]
-            self.JSON_data['variants']['rows'][variant_i_arg][6] = 'MANUAL'
+        if update_type =='PASS':
+            # handle heterozygous input by removing the reference allele from the alt allele 
+            if len(variant_nucleotide_arg) == 1: 
+                genotype='hom. ALT'
+            else:
+                genotype='het.'
+                for allele in variant_nucleotide_arg:
+                    if allele == self.JSON_data['variants']['rows'][variant_i_arg][3]:
+                        variant_nucleotide_arg.remove(allele)
+                        break
+            #If there's a change from the reference allele, mark as MANUAL
+            if not (variant_nucleotide_arg[0] == self.JSON_data['variants']['rows'][variant_i_arg][4]):
+                self.JSON_data['variants']['rows'][variant_i_arg][4] = variant_nucleotide_arg[0]
+                self.JSON_data['variants']['rows'][variant_i_arg][6] = 'MANUAL'
+                self.JSON_data['variants']['rows'][variant_i_arg][8] = genotype
         elif (
             update_type == 'SKIP_ERROR'
             or update_type == 'TRIM_ERROR'
@@ -403,9 +400,6 @@ class JSON_data():
             #This is because the ALT call is no longer valid
             self.JSON_data['variants']['rows'][variant_i_arg][4] = self.JSON_data['variants']['rows'][variant_i_arg][3]
             self.JSON_data['variants']['rows'][variant_i_arg][6] = update_type
-        self.JSON_data['variants']['rows'][variant_i_arg][5] = '-'
-        self.JSON_data['variants']['rows'][variant_i_arg][8] = genotype
-
 
     def translate_variant(self, variant_value_arg: list) -> str:
         """

@@ -34,7 +34,7 @@ def main():
     json_directory, output_path, filter_flag = parse_args()
     #Create and setup output CSV file
     csv_output_path = output_path.joinpath('variants.csv')
-    csv_file = open(csv_output_path, 'w')
+    csv_file = open(csv_output_path, 'w', newline='')
     csv_writer = csv.writer(csv_file, delimiter=',')
     csv_writer.writerow(
         (

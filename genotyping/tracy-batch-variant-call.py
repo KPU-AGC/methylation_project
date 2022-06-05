@@ -194,7 +194,7 @@ def output_summary(output_path, best_runs, failed_runs, sample_info):
     csv_file = open(csv_output_path, 'w')
     csv_writer = csv.writer(csv_file, delimiter=',')
     csv_writer.writerow(('Best runs',))
-    csv_writer.writerow(('Sample', 'Trace score', 'Median PUP', 'Left Trim', 'Right Trim', 'Untrimmed length', 'Trimmed length'))
+    csv_writer.writerow(('File name', 'Sample_name', 'Primer name', 'Trace score', 'Median PUP', 'Left Trim', 'Right Trim', 'Untrimmed length', 'Trimmed length'))
     csv_writer.writerows(best_runs)
     csv_writer.writerow(('Failed runs',))
     csv_writer.writerow(('Sample', 'Trace score', 'Median PUP'))
@@ -245,8 +245,11 @@ def main() -> None:
 
         if best_run:
             run_name = check_name(best_run)
+            name_components = run_name.split('_')
+            sample_name = name_components[0]
+            primer_name = name_components[1]
             left_trim, right_trim, untrim_len, trim_len = abi_trim(best_run)
-            best_run_samples.append((run.name, best_trace, best_pup, left_trim, right_trim, untrim_len, trim_len))
+            best_run_samples.append((run.name, sample_name, primer_name, best_trace, best_pup, left_trim, right_trim, untrim_len, trim_len))
 
             run_tracy(
                 primer_id_arg=f"{run_name['primer_id']}-{run_name['direction']}",

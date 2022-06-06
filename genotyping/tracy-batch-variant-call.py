@@ -194,7 +194,7 @@ def output_summary(output_path, best_runs, failed_runs, sample_info):
     csv_file = open(csv_output_path, 'w')
     csv_writer = csv.writer(csv_file, delimiter=',')
     csv_writer.writerow(('Best runs',))
-    csv_writer.writerow(('File name', 'Sample_name', 'Primer name', 'Run date', 'Trace score', 'Median PUP', 'Left Trim', 'Right Trim', 'Untrimmed length', 'Trimmed length'))
+    csv_writer.writerow(('File name', 'Sample name', 'Primer name', 'Run date', 'Trace score', 'Median PUP', 'Left Trim', 'Right Trim', 'Untrimmed length', 'Trimmed length'))
     csv_writer.writerows(best_runs)
     csv_writer.writerow(('Failed runs',))
     csv_writer.writerow(('Sample', 'Trace score', 'Median PUP'))

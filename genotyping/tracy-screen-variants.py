@@ -515,6 +515,9 @@ class JSON_data():
             input('No eligible variants. Press enter to continue...')
 
 def sort_file_names(list_paths):
+    """
+    Sorts file names by gene
+    """
     list_dater = []
     for path in list_paths: 
         item = path.stem.split('_')

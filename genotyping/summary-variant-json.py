@@ -88,7 +88,7 @@ def main():
     #Output file
     for gene in all_data:
         with open(output_path.joinpath(f'{gene}_variants.csv'), 'w', newline='') as output_csv:
-            all_data[gene].to_csv(output_csv)
+            all_data[gene].to_csv(output_csv, na_rep='NaN')
 
 if __name__ == '__main__': 
     main()

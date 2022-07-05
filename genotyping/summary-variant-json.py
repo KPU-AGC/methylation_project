@@ -66,6 +66,7 @@ def main():
                     'REF':variant[3]+'/'+variant[3],
                 }
             #Check variant type
+            #TO-DO: CHECK FOR DISAGREEMENT FOR SNPS THAT HAVE BEEN DEFINED AS DIFFERENT VARIANT CALLS
             if variant[8] == 'hom. ALT':
                 variant_data[variant_position][sample_name] = variant[4]+'/'+variant[4]
             elif variant[8] == 'het.':

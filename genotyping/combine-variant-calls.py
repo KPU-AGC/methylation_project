@@ -62,8 +62,7 @@ def json_output(data, output_path):
 
 def main(): 
     json_directory, output_path, filter_flag = parse_args()
-    variant_data = {
-    }
+    variant_data = {}
 
     #Generate variants list
     for json_path in json_directory.glob('*.json'):

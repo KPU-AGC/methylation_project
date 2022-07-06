@@ -26,10 +26,16 @@ def parse_args():
         action='store_true',
         help='Set to true if you want all variants'
     )
+    parser.add_argument(
+        '--output_by_sample',
+        dest='job_flag',
+        action='store_true',
+        help='If set, individual json and csvs will be prepared'
+    )
     args = parser.parse_args()
     if args.output_path is None: 
         args.output_path = args.json_directory
-    return (args.json_directory, args.output_path, args.filter_flag)
+    return (args.json_directory, args.output_path, args.filter_flag, args.job_flag)
 
 def csv_output(data, output_path): 
     header=(
@@ -60,10 +66,16 @@ def json_output(data, output_path):
     with open(output_path.joinpath(f'output_json.json'), 'w') as new_JSON:
         new_JSON.write(prettied_json)
 
+<<<<<<< Updated upstream
 def main(): 
     json_directory, output_path, filter_flag = parse_args()
     variant_data = {}
 
+=======
+def output_by_loci(json_directory, filter_flag): 
+    variant_data = {
+    }
+>>>>>>> Stashed changes
     #Generate variants list
     for json_path in json_directory.glob('*.json'):
         json_file = open(json_path, 'r')
@@ -91,6 +103,46 @@ def main():
                 variant[2] = sample_name + '_' + primer_name
                 variant_data[primer_id]['variants'].append(variant)
         json_file.close()
+    return variant_data
+
+def output_by_sample(json_directory, filter_flag): 
+    individual_data = {
+    }
+    #Generate variants list
+    for json_path in json_directory.glob('*.json'):
+        json_file = open(json_path, 'r')
+        sample_data = json.load(json_file)
+        #HARDCODED: CURRENTLY SAMPLE_GENE-PRIMER-DIRECTION ENFORCED IN JSON NAME
+        #Distinction between ID and name --> ID does not preserve directionality
+        #This is important because we want to pool the SNP calls in reads of forward and reverse direction
+        #TO-DO: handle when the snp calls are different between forward and reverse reads
+        sample_name = json_path.stem.split('_')[0]
+        primer_name = json_path.stem.split('_')[1]
+        primer_id = '-'.join(primer_name.split('-')[0:2])
+        #Create appropriate data structures
+        if sample_name not in individual_data.keys():
+            individual_data[sample_name] = {'primer_matrix':[], 'variants':[]}
+        if primer_name not in individual_data[sample_name]['primer_matrix']: 
+            individual_data[sample_name]['primer_matrix'].append(primer_name)
+        #Add variant data
+        for variant in sample_data['variants']['rows']:
+            #[6] - FILTER
+            #[2] - ID - populate with gene-primer
+            if (
+                variant[6] in ('PASS','MANUAL')
+                or filter_flag is True
+            ):
+                variant[2] = sample_name + '_' + primer_name
+                individual_data[sample_name]['variants'].append(variant)
+        json_file.close()
+    return individual_data
+        
+def main(): 
+    json_directory, output_path, filter_flag, job_flag = parse_args()
+    if job_flag: 
+        variant_data = output_by_sample(json_directory, filter_flag)
+    else: 
+        variant_data = output_by_loci(json_directory, filter_flag)
     #Generate json output
     json_output(variant_data, output_path)
     #Output csv

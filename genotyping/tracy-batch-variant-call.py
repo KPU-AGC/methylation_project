@@ -3,6 +3,8 @@
 Author : Erick Samera
 Date   : 2022-05-22
 Purpose: To batch together 'tracy decompose' commands.
+
+NOTE: THE VARIANTS ARE RECORDED IN 1-BASED COORDINATES. 
 """
 
 import argparse

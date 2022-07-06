@@ -19,6 +19,6 @@ do
         #samtools index $mapped/"$prefix"_1_bismark_bt2_pe-sorted.bam
 done < $data/ngs_runlist.txt
 #Move files to correct directory
-mv -t $filter_incomplete *nonCG_filtered* *.non-conversion_filtering.txt 
+mv -t $filter_incomplete $mapped/*nonCG_filtered* $mapped/*.non-conversion_filtering.txt 
 #mv *nonCG_filtered* $filter_incomplete
 #mv *.non-conversion_filtering.txt $filter_incomplete

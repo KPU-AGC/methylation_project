@@ -4,7 +4,7 @@ data=../data
 results=../results
 trimmed=$results/trimmed
 fastqc=$results/fastqc
-conda_env=~/miniconda3/envs/ngs/share/trimmomatic-0.39-2
+conda_env=~/miniconda3/envs/ngs-qc/share/trimmomatic-0.39-2
 #Check if directories exist, if not create
 [ ! -d $fastqc ] && mkdir -p $fastqc
 [ ! -d $trimmed ] && mkdir -p $trimmed

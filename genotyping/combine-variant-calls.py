@@ -66,16 +66,9 @@ def json_output(data, output_path):
     with open(output_path.joinpath(f'output_json.json'), 'w') as new_JSON:
         new_JSON.write(prettied_json)
 
-<<<<<<< Updated upstream
-def main(): 
-    json_directory, output_path, filter_flag = parse_args()
-    variant_data = {}
-
-=======
 def output_by_loci(json_directory, filter_flag): 
     variant_data = {
     }
->>>>>>> Stashed changes
     #Generate variants list
     for json_path in json_directory.glob('*.json'):
         json_file = open(json_path, 'r')

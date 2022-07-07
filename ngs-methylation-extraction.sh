@@ -10,7 +10,5 @@ methylation_extraction=$results/methylation_extraction
 #Methylation extraction
 while read prefix
 do
-    bismark_methylation_extractor --gzip --bedGraph --cutoff 30 -p --parallel 4 -o $methylation_extraction $filter_incomplete/"$prefix"_1_bismark_bt2_pe.nonCG_filtered.bam 
+    bismark_methylation_extractor --gzip --bedGraph --cutoff 15 -p --parallel 4 -o $methylation_extraction $filter_incomplete/"$prefix"_1_bismark_bt2_pe.nonCG_filtered.bam 
 done < $data/ngs_runlist.txt
-
-mv -t $methylation_extraction $filter_incomplete/*.gz ß

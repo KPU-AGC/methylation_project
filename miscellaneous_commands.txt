@@ -1,0 +1,1 @@
+bismark_methylation_extractor --bedGraph -p --parallel 4 ../incomplete_conversion/*.nonCG_filtered.bam

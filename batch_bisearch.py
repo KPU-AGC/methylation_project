@@ -24,7 +24,7 @@ class Args(NamedTuple):
     """ Command-line arguments """
 
     fasta_file_path: pathlib.Path
-    output_dir: bool
+    output_dir: pathlib.Path
 
     bis: bool
     strand: str
@@ -52,8 +52,10 @@ def get_args() -> Args:
 
     parser.add_argument('-o',
         '--output_dir',
+        type=pathlib.Path,
+        default=None,
         help="flag whether directory 'output' will be created",
-        action='store_true')
+        action='store')
 
     group_BiSearch = parser.add_argument_group('BiSearch parameters')
 
@@ -112,6 +114,8 @@ def get_args() -> Args:
 
     if args.strand and not args.bis:
         parser.error('--strand is only applicable if bisulfite-converted.')
+    if args.output_dir is None: 
+        args.output_dir = args.fasta_file_path.parent
 
     return Args(args.fasta_file_path, args.output_dir, args.bis, args.strand, args.max, args.sub, args.tries, args.verbose, args.seed)
 
@@ -426,7 +430,7 @@ def main() -> None:
     args = get_args()
 
     fasta_file_path_arg = args.fasta_file_path.resolve()
-    output_dir_arg, bis_arg, strand_arg, max_arg, sub_arg, tries_arg  = args.output_dir, args.bis, args.strand, args.max, args.sub, args.tries
+    output_path, bis_arg, strand_arg, max_arg, sub_arg, tries_arg  = args.output_dir, args.bis, args.strand, args.max, args.sub, args.tries
 
     verbose_arg, seed_arg = args.verbose, args.seed
     random.seed(seed_arg)
@@ -434,13 +438,13 @@ def main() -> None:
     print_runtime('Started job')
 
     # check output_dir flag, if true: make an output dir
-    if output_dir_arg:
-        output_flag = 'BiSearch_primer_design'
-        output_path_string = f'{output_flag}-output-{time.strftime("%Y_%m_%d_%H%M%S", time.localtime(time.time()))}'
-        output_path = fasta_file_path_arg.joinpath(output_path_string)
-        output_path.mkdir(parents=True, exist_ok=True)
-    else:
-        output_path = fasta_file_path_arg.parent
+    #if output_dir_arg:
+    #    output_flag = 'BiSearch_primer_design'
+    #    output_path_string = f'{output_flag}-output-{time.strftime("%Y_%m_%d_%H%M%S", time.localtime(time.time()))}'
+    #    output_path = fasta_file_path_arg.joinpath(output_path_string)
+    #    output_path.mkdir(parents=True, exist_ok=True)
+    #else:
+    #    output_path = fasta_file_path_arg.parent
 
     # generate params
     generate_params_file(output_path, get_args())

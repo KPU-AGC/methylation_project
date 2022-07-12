@@ -53,7 +53,7 @@ def main():
                     data.insert(1, sample_name)
                     list_data.append(data)
                     break
-        data_by_primer[primer_name] = list_data
+        data_by_primer[primer_name] = sorted(list_data, key=lambda sample: sample[1])
     
     for primer_name in data_by_primer.keys(): 
         csv_output_path = output_path.joinpath(f'{primer_name}_summary.csv')
@@ -63,7 +63,8 @@ def main():
                 (
                     'primer_name',
                     'sample_name',
-                    '#CG',
+                    '#CG_total',
+                    '#CG_covered',
                     'mean_methylation',
                     'std_methylation',
                     'mean_coverage',

@@ -6,7 +6,8 @@ from collections import namedtuple
 
 class CoverageHandler(): 
     #TODO: FILL OUT THIS CLASS WITH THE FUNCTION IN MAIN()
-    pass
+    def __init__(self, coverage_path, primer_path): 
+        pass
 
 def parse_args(): 
     parser = argparse.ArgumentParser("Script to analyze the coverage files")
@@ -43,6 +44,7 @@ def main():
     #COORDINATES TO 0-BASED AS WELL. 
     coverage_path, primer_path, output_path = parse_args()
     coverage_df = pd.read_table(coverage_path, names=('chromosome','start','end','methylation_percentage','count_methylated','count_unmethylated'))
+
     #Import primers
     Primer = namedtuple('Primer','chromosome, start, end, primer, sequence')
     with open(primer_path, 'r', encoding='utf-8-sig') as primer_file: 
@@ -50,14 +52,21 @@ def main():
         primer_data = []
         for primer in map(Primer._make, csv_reader): 
             primer_data.append(primer)
+
     #MUTE chained assignment warning
     pd.options.mode.chained_assignment = None
+    
+    #Summary data
+    summary_data = []
+
     #Perform for each primer set
     for primer in primer_data:
         #Get Dataframe of CG positions within primer region 
         region_df = coverage_df[(coverage_df.chromosome == primer.chromosome) & (coverage_df.start > int(primer.start)) & (coverage_df.end < int(primer.end))]
-        #Get position on sequence file, in 0-based coordinates, for each CG position
+        #For each CG position, get the position relative to the sequence file in 0-based coordinate, then store in dataframe
         region_df.loc[:,'seq_pos'] = region_df.loc[:,'start'] - 1 - int(primer.start)
+        #Sum unmethylated and methylated read calls to get total coverage
+        region_df.loc[:,'coverage'] = region_df.loc[:,'count_methylated']+region_df.loc[:,'count_unmethylated']
         #Determine basecall for each CG position (is it C or G)
         basecalls = []
         for cg in region_df.iterrows(): 
@@ -72,36 +81,65 @@ def main():
         else: 
             primer_df= region_df.loc[region_df['basecall']=='G']
         
-        #for cg in primer_df.iterrows(): 
-        #    cg_data = cg[1]
-            #Coordinate of the CG is 1-based.
-            #Convert to 0, then subtract to find the 0-based coordinate, starting at 0. 
-        #    cg_pos = cg_data['start'] - 1 - int(primer.start)
-            
-            
-            
-        #    start = cg_data['start']
-        #    print(f'{start} : {primer.start}')
-        #    print(f'{primer.sequence[cg_pos]} : {primer.sequence[0]} : {primer.primer}')
-        #print(primer.sequence)
-        #print(primer_df)
+        number_cg = len(primer_df)
         methylation_avg = primer_df['methylation_percentage'].mean()
         methylation_std = primer_df['methylation_percentage'].std()
-        methylation_count_avg = primer_df['count_methylated'].mean()
-        methylation_count_std = primer_df['count_methylated'].std()
-        unmethylated_count_avg = primer_df['count_unmethylated'].mean()
-        unmethylated_count_std = primer_df['count_unmethylated'].std()
-        coverage_avg = (primer_df['count_methylated'] + primer_df['count_unmethylated']).mean()
-        coverage_std = (primer_df['count_methylated'] + primer_df['count_unmethylated']).std()
+        coverage_avg = primer_df['coverage'].mean()
+        coverage_std = primer_df['coverage'].std()
+        under_coverage = sum(primer_df['coverage'] < coverage_avg)
+        summary_data.append(
+            (
+                primer.primer,
+                number_cg,
+                methylation_avg, 
+                methylation_std, 
+                coverage_avg, 
+                coverage_std,
+                under_coverage
+                )
+            )
         print(f'{primer.primer} mean methylation: {methylation_avg}')
         print(f'{primer.primer} std methylation: {methylation_std}')
         print(f'{primer.primer} mean coverage: {coverage_avg}')
         print(f'{primer.primer} std coverage: {coverage_std}')
+        print(f'{primer.primer} number CG under mean coverage: {under_coverage}')
 
         if primer_df.empty: 
             print('No data.')
         else: 
             print(primer_df)
+            primer_data_path = output_path.joinpath(f'{coverage_path.stem}_{primer.primer}.processed.csv')
+            primer_df.to_csv(primer_data_path, index=False)
+
+    summary_names=(
+        'primer',
+        '#CG',
+        'mean_methylation',
+        'std_methylation',
+        'mean_coverage',
+        'std_coverage',
+        '#CG<mean',
+    )
+    summary_df = pd.DataFrame(summary_data, columns=summary_names)
+
+    output_csv_path = output_path.joinpath(f'{coverage_path.stem}_summary.csv')
+    '''
+    with open(output_csv_path, 'w', newline='') as output_csv: 
+        csvwriter = csv.writer(output_csv, delimiter=',')
+        csvwriter.writerow(
+            (
+                'primer',
+                '#CG',
+                'mean_methylation',
+                'std_methylation',
+                'mean_coverage',
+                'std_coverage',
+                '#CG<mean',
+            )
+        )
+        csvwriter.writerows(summary_data)
+    '''
+    summary_df.to_csv(output_csv_path, index=False)
 
 if __name__ == '__main__': 
     main()

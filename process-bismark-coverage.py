@@ -46,12 +46,23 @@ def main():
     coverage_df = pd.read_table(coverage_path, names=('chromosome','start','end','methylation_percentage','count_methylated','count_unmethylated'))
 
     #Import primers
-    Primer = namedtuple('Primer','chromosome, start, end, primer, sequence')
+    Primer = namedtuple('Primer','chromosome, start, end, primer, sequence, num_cg')
     with open(primer_path, 'r', encoding='utf-8-sig') as primer_file: 
         csv_reader = csv.reader(primer_file, delimiter='\t')
         primer_data = []
-        for primer in map(Primer._make, csv_reader): 
-            primer_data.append(primer)
+        #for primer in map(Primer._make, csv_reader): 
+        #    primer_data.append(primer)
+        for primer in csv_reader: 
+            num_cg = primer[4].count('CG')
+            primer_data.append(Primer(
+                primer[0],
+                primer[1],
+                primer[2],
+                primer[3],
+                primer[4],
+                num_cg
+            ))
+            pass
 
     #MUTE chained assignment warning
     pd.options.mode.chained_assignment = None
@@ -90,6 +101,7 @@ def main():
         summary_data.append(
             (
                 primer.primer,
+                primer.num_cg,
                 number_cg,
                 methylation_avg, 
                 methylation_std, 
@@ -113,7 +125,8 @@ def main():
 
     summary_names=(
         'primer',
-        '#CG',
+        '#CG_total',
+        '#CG_covered',
         'mean_methylation',
         'std_methylation',
         'mean_coverage',
@@ -129,7 +142,8 @@ def main():
         csvwriter.writerow(
             (
                 'primer',
-                '#CG',
+                '#CG_total,
+                '#CG_covered',
                 'mean_methylation',
                 'std_methylation',
                 'mean_coverage',

@@ -43,7 +43,7 @@ def main():
     #THEREFORE, TO MAINTAIN CONSISTENCY IN MATH, WE WILL CONVERT THE COVERAGE REPORT
     #COORDINATES TO 0-BASED AS WELL. 
     coverage_path, primer_path, output_path = parse_args()
-    coverage_df = pd.read_table(coverage_path, names=('chromosome','start','end','methylation_percentage','count_methylated','count_unmethylated'))
+    coverage_df = pd.read_table(coverage_path, names=('chromosome','start','end','methylation_percentage','count_methylated','count_unmethylated'), dtype={'chromosome':'str'})
 
     #Import primers
     Primer = namedtuple('Primer','chromosome, start, end, primer, sequence, num_cg')

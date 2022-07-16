@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
 Author : Erick Samera
-Date   : 2021-12-30 -> 2022-02-03
-Purpose: Performs BiSearch primer design for all .fasta files in a given folder.
+Date   : 2021-12-30 -> 2022-07-15
+Purpose: Performs BiSearch primer design for a given fasta or all .fasta files in a given directory.
 """
+
+# TODO: Continue to refine the rate-limiter for BiSearch. Also improve documentation and continue refactoring.
 
 import argparse
 from typing import NamedTuple
@@ -18,13 +20,13 @@ from Bio import SeqIO
 try:
     import mechanicalsoup
 except ImportError as e:
-    print('This relies on MechanicalSoup')
+    print('MechanicalSoup is required for BiSearch WebScraping.')
 
 class Args(NamedTuple):
     """ Command-line arguments """
 
-    fasta_file_path: pathlib.Path
-    output_dir: pathlib.Path
+    input_path: pathlib.Path
+    output_path: pathlib.Path
 
     bis: bool
     strand: str
@@ -33,70 +35,75 @@ class Args(NamedTuple):
     sub: int
     tries: int
 
+    ignore_rate_lim: bool
     verbose: bool
     seed: int
-
 # --------------------------------------------------
 def get_args() -> Args:
     """ Get command-line arguments """
 
     parser = argparse.ArgumentParser(
-        description='Program parses .fasta files and generates primers for bisulfite-converted template via BiSearch.',
-        usage='%(prog)s [options] [fasta_file_path]',
+        description='Program parses .FASTA files and generates primers for bisulfite-converted template via BiSearch.',
+        usage='%(prog)s [options] [input_path] [output_path]',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('fasta_file_path',
-        metavar='fasta_file_path',
+    parser.add_argument(
+        'input_path',
+        metavar='input_path',
         type=pathlib.Path,
-        help='.fasta file or directory containing .fasta files')
+        help='path of .FASTA file or directory containing .FASTA files')
 
-    parser.add_argument('-o',
-        '--output_dir',
+    parser.add_argument(
+        'output_path',
+        metavar='output_path',
         type=pathlib.Path,
-        default=None,
-        help="flag whether directory 'output' will be created",
-        action='store')
+        help="path of output directory")
 
     group_BiSearch = parser.add_argument_group('BiSearch parameters')
 
-    group_BiSearch.add_argument('--bis',
+    group_BiSearch.add_argument(
+        '--bis',
         help="bisulfite-converted",
         action='store_true')
 
-    group_BiSearch.add_argument('--strand',
+    group_BiSearch.add_argument(
+        '--strand',
         help="specify target strand after bisulfite-conversion {sense= 'p', antisense = 'm'}",
         choices=['p', 'm'],
         type=str,
         default=None)
 
-    group_BiSearch.add_argument('--max',
+    group_BiSearch.add_argument(
+        '--max',
         help="max length for PCR",
         metavar='<n>',
         type=int,
-        default=599)
+        default=400)
 
     group_subsequence = parser.add_argument_group('subsequence search options')
 
-    group_subsequence.add_argument('-s',
+    group_subsequence.add_argument(
+        '-s',
         '--sub',
         help='divide the sequence into <n> subsequences to pull tries from',
         metavar='<n>',
         type=int,
         default=1)
 
-    group_subsequence.add_argument('-t',
+    group_subsequence.add_argument(
+        '-t',
         '--tries',
         help='number of tries to attempt in each subsequences',
         metavar='<n>',
         type=int,
         default=1)
 
-    group_subsequence.add_argument('-f',
-        '--focus',
-        help='focus search only on CpG-dense region',
-        action='store_false')
-
     group_debug = parser.add_argument_group('debug')
+
+    group_debug.add_argument(
+        '--ignore_rate_lim',
+        help='ignore rate-limiters',
+        action='store_true')
 
     group_debug.add_argument('-v',
         dest='verbose',
@@ -114,36 +121,64 @@ def get_args() -> Args:
 
     if args.strand and not args.bis:
         parser.error('--strand is only applicable if bisulfite-converted.')
-    if args.output_dir is None: 
-        args.output_dir = args.fasta_file_path.parent
 
-    return Args(args.fasta_file_path, args.output_dir, args.bis, args.strand, args.max, args.sub, args.tries, args.verbose, args.seed)
+    if args.ignore_rate_lim:
+        print(print_warning('Ignoring the rate-limiter risks blacklisting! And it will be completely your fault.'))
 
+    return Args(args.input_path, args.output_path, args.bis, args.strand, args.max, args.sub, args.tries, args.ignore_rate_lim, args.verbose, args.seed)
 # --------------------------------------------------
 class BiSearch_condition:
     """
-    BiSearch conditions to be queried with a browser instance
+    A class to represent a set of conditions to be passed to BiSearch Primer Design. 
+
+    Attributes (that you care about):
+        args (Args): set of arguments to pass for handling verbosity and logging
+        run_info (str): information stored to handle logging
+        sequence (str): query sequence to search for primers
+        bisulfite (bool): bisulfite conversion status, True = Bisulfite converted
+        strand (str): only applicable after bisulfite conversion, 'p' = (+) strand, 'm' = (-) strand
+        forward_start (int): forward primer, start of query region
+        forward_end (int): forward primer, end of query region
+        reverse_start (int): reverse primer, start of query region
+        reverse_end (int): reverse primer, end of query region
+        PCR_max_length (int): maximum length (nucleotides) of PCR amplicon to query
+        primer_conc (float): concentration of primers (uM)
+        potassium_conc (float): concentration of potassium (mM)
+        magnesium_conc (float): concentration of magnesium (mM)
+        results_list (int): maximum number of top results to show, best keep this at 10 unless you're absolutely desperate
+        genome (str): genome to query for ePCR
+
+    BiSearch_primer:
+        A class to represent a primer retrieved from BiSearch Primer Design.
+
+        do_BiSearch_ePCR():
+            A function to perform BiSearch ePCR with a given set of primer information.
+    
+    do_BiSearch_primer_design():
+        A function to perform BiSearch Primer Design with a given condition.
     """
+
     BiSearch_form_mapping = (
-            'seq',		# query sequence
-            'bis',		# bisulfite status (True = bisulfite-converted)
-            'sens',		# strand (only available if bisulfite-converted)
-            'fbeg',		# forward primer, beginning of primer query
-            'fend',		# forward primer, end of primer query
-            'rbeg',		# reverse primer, beginning of primer query
-            'rend',		# reverse primer, end of primer query
-            'len',		# maximum PCR length
+        'seq',      # query sequence
+        'bis',      # bisulfite status (True = bisulfite-converted)
+        'sens',     # strand (only available if bisulfite-converted)
+        'fbeg',     # forward primer, beginning of primer query
+        'fend',     # forward primer, end of primer query
+        'rbeg',     # reverse primer, beginning of primer query
+        'rend',     # reverse primer, end of primer query
+        'len',      # maximum PCR length
 
-            'pc',		# primer concentration (umol)
-            'kc',		# potassium concentration (mmol)
-            'mgc',		# magnesium concentration (mmol)
+        'pc',       # primer concentration (umol)
+        'kc',       # potassium concentration (mmol)
+        'mgc',      # magnesium concentration (mmol)
 
-            'nstore',	# results list size (still sorted by score, not necessary)
+        'nstore',   # results list size (still sorted by score, not necessary)
 
-            'db')		# database for ePCR
-
+        'db')       # database for ePCR
     def __init__(
             self,
+            args: Args,                     # list of arguments to easily handle verbosity and logging
+            run_info: str,                  # run_info (str) to handle logging
             sequence: str = '',             # query sequence to search for primers
             bisulfite: bool = False,        # bisulfite conversion status, True = bisulfited converted
             strand = None,                  # only applicable after bislfite conversion, 'p' = (+) strand, 'm' = (-) strand
@@ -151,7 +186,7 @@ class BiSearch_condition:
             forward_end: int = None,        # forward primer, end of query region
             reverse_start: int = None,      # reverse primer, start of query region
             reverse_end: int = None,        # reverse primer, end of query region
-            PCR_max_length: int = 599,      # maximum length (nucleotides) of PCR amplicon to query
+            PCR_max_length: int = 400,      # maximum length (nucleotides) of PCR amplicon to query
 
             primer_conc: float = 2,         # concentration of primers (uM)
             potassium_conc: float = 1.0,    # concentration of potassium (mM)
@@ -161,15 +196,21 @@ class BiSearch_condition:
 
             genome = 'Bos taurus'):         # genome to query for ePCR
 
+        self.args = args
+        self.run_info = run_info
+
         self.sequence = str(sequence.seq)
         self.bisulfite = bisulfite
 
         # strand is only important if bisulfite converted. If bisulfite converted and no strand specified, default to 'p' strand
-        if bisulfite and strand is not None:
+        if bisulfite and strand:
             self.strand = strand
-        elif bisulfite and strand is None:
+        elif bisulfite and not strand:
             self.strand = 'p'
-        else:
+            # logging information
+            current_action = print_runtime(f'No strand was given, defaulted to positive strand.')
+            log_and_print(current_action, 2, args, run_info)
+        elif not bisulfite:
             self.strand = None
 
         # everything else
@@ -206,40 +247,49 @@ class BiSearch_condition:
             self.genome)
 
         self.primers_list = []
-
+        
+        # logging information
+        current_action = print_runtime(f'Initialized BiSearch conditions for web service.')
+        log_and_print(current_action, 2, args, run_info)
     def __repr__(self):
         return f'< {self.strand} (start-{self.forward_end}) -- ({self.reverse_start}-end) >'
-
     class BiSearch_primer:
         """
-        BiSearch primers
+        A class to represent a BiSearch primer as retrieved by BiSearch Primer Design.
+
+        Attributes (that you care about):
+            basically everything from before
+        
+        do_BiSearch_ePCR():
+            A function to perform BiSearch ePCR with a given set of primer information.
         """
+
         ePCR_form_mapping = (
-            'fp',		# forward primer sequence
-            'rp',		# reverse primer sequence
-            'bis',		# bisulfite status
-            'db',		# genome database
-            'fpcrlen'	# max ePCR length
+            'fp',       # forward primer sequence
+            'rp',       # reverse primer sequence
+            'bis',      # bisulfite status
+            'db',       # genome database
+            'fpcrlen'   # max ePCR length
             )
 
         def __init__(
                 self,
+                args,
+                run_info,
                 strand,
                 score,
-                f_seq,
-                f_length,
-                f_GC,
-                f_Tm,
-                r_seq,
-                r_length,
-                r_GC,
-                r_Tm,
-                amp_start,
-                amp_end,
-                amp_length,
-                CpG_count
+                f_seq, f_length, f_GC, f_Tm,
+                r_seq, r_length, r_GC, r_Tm,
+                amp_start, amp_end, amp_length,
+                CpG_count,
+                f_self_anneal, f_self_end_anneal,
+                r_self_anneal, r_self_end_anneal,
+                pair_anneal, pair_end_anneal,
+                primer_info_link
                 ):
 
+            self.args = args
+            self.run_info = run_info
             self.strand = strand
             self.score = score
             self.f_seq = f_seq
@@ -254,18 +304,37 @@ class BiSearch_condition:
             self.amp_end = amp_end
             self.amp_length = amp_length
             self.CpG_count = CpG_count
+            self.f_self_anneal = f_self_anneal if f_self_anneal else 0
+            self.f_self_end_anneal = f_self_end_anneal if f_self_end_anneal else 0
+            self.r_self_anneal = r_self_anneal if r_self_anneal else 0
+            self.r_self_end_anneal = r_self_end_anneal if r_self_end_anneal else 0
+            self.pair_anneal = pair_anneal if pair_anneal else 0
+            self.pair_end_anneal = pair_end_anneal if pair_end_anneal else 0
+            self.primer_info_link = primer_info_link if primer_info_link else 0
 
             self.primer_binds = []
-
         def __repr__(self) -> None:
             return f'< str: {self.strand}, f: {self.f_seq}, r: {self.r_seq}, score: {self.score}, length: {self.amp_length}, CpG count: {self.CpG_count}>'
+        def do_BiSearch_ePCR(self, max_pcr_len: int = 1000) -> tuple:
+            """
+            Function to automatically perform BiSearch ePCR and retrieve results.
 
-        def do_BiSearch_ePCR(self, max_pcr_len=1000) -> None:
+            Parameters:
+                self: the instance of the BiSearch primer
+                max_pcr_len (int): maximum length to perform in silico PCR
+            
+            Returns:
+                (tuple) of primer bind information and intended PCR product 
             """
-            asdf
-            """
+
+            if not self.args.ignore_rate_lim:
+                current_action = print_runtime(f'Performing necessary rate-limiting for BiSearch ePCR ...')
+                log_and_print(current_action, 3, self.args, self.run_info)
+                time.sleep(15)
+                current_action = print_runtime(f'Rate-limiting done.')
+                log_and_print(current_action, 3, self.args, self.run_info)
+
             # define the ePCR conditions
-
             # initialize browser instance for BiSearch ePCR
             browser = mechanicalsoup.StatefulBrowser(soup_config={'features': 'lxml'})
             browser.open("http://bisearch.enzim.hu/?m=genompsearch")
@@ -280,6 +349,8 @@ class BiSearch_condition:
                 self.r_seq = self.r_seq.replace(*r)
 
             list(map(browser.form.set, self.ePCR_form_mapping, (self.f_seq, self.r_seq, True, 'Bos taurus', max_pcr_len)))
+            current_action = print_runtime(f'Submitting request for BiSearch ePCR ...')
+            log_and_print(current_action, 2, self.args, self.run_info)
             browser.submit_selected()
 
             #  find primer binds based on their position on the website
@@ -295,10 +366,17 @@ class BiSearch_condition:
             # define relative position of primer binds on strands
             pos_primer_matches = browser.get_current_page().find_all(text=re.compile('found based'))
 
-            # for each in primer binds, find the values
-            for i in range(len(self.primer_binds)):
-                self.primer_binds[i] = pos_primer_matches[i].strip()[:-55] if len(pos_primer_matches[i].strip()[:-55]) > 0 else 0
-
+            try:
+                # for each in primer binds, find the values
+                for i, _ in enumerate(self.primer_binds):
+                    self.primer_binds[i] = pos_primer_matches[i].strip()[:-55] if len(pos_primer_matches[i].strip()[:-55]) > 0 else 0
+                current_action = print_runtime(f'Retrieved primer bind values.')
+                log_and_print(current_action, 1, self.args, self.run_info)
+            except IndexError:
+                # logging information
+                current_action = print_warning(f'An error occurred in finding primer binds!\nTried to use  <F:{self.f_seq}> and <R:{self.r_seq}>.')
+                log_and_print(current_action, 0, self.args, self.run_info)
+                return None
 
             #  find  number of PCR products on the sense and antisense strand
             # --------------------------------------------------
@@ -323,22 +401,34 @@ class BiSearch_condition:
             if self.strand == 'p' and self.PCR_products_p > 0:
                 pos_amp = 3
                 pos_amp_str = self.pos_PCR_prod_p
-
             elif self.strand == 'm' and self.PCR_products_n > 0:
                 pos_amp = 6
                 pos_amp_str = self.pos_PCR_prod_n
 
-            if pos_amp is not None:
-                i_containing_amplicon = [i for i, s in enumerate(browser.get_current_page().find_all('h3')[pos_amp].find_next_siblings()[pos_amp_str].find_all(text=re.compile('len'))) if str(self.amp_length) in s][0]
-                web_container = str(browser.get_current_page().find_all('h3')[pos_amp].find_next_siblings()[pos_amp_str].find_all('a')[i_containing_amplicon]).split('?')[1].split(';')
+            if pos_amp:
+                try:
+                    i_containing_amplicon = [i for i, s in enumerate(browser.get_current_page().find_all('h3')[pos_amp].find_next_siblings()[pos_amp_str].find_all(text=re.compile('len'))) if str(self.amp_length) in s][0]
+                    web_container = str(browser.get_current_page().find_all('h3')[pos_amp].find_next_siblings()[pos_amp_str].find_all('a')[i_containing_amplicon]).split('?')[1].split(';')
 
-                self.amp_chromosome_num = web_container[0][4:-4]
-                self.amp_genomic_start = web_container[2][6:-4]
-                self.amp_genomic_end = web_container[3].split('"')[0][4:]
+                    self.amp_chromosome_num = web_container[0][4:-4]
+                    self.amp_genomic_start = web_container[2][6:-4]
+                    self.amp_genomic_end = web_container[3].split('"')[0][4:]
+                
+                    current_action = print_runtime(f'Retrieved amplicon coordinates ...')
+                    log_and_print(current_action, 2, self.args, self.run_info)
+                except:
+                    current_action = print_warning(f'Error occurred in retrieving amplicon coordinates!')
+                    log_and_print(current_action, 0, self.args, self.run_info)
 
             self.num_degen_bases = sum(map(self.f_seq.count, ['R','Y'])) + sum(map(self.r_seq.count, ['R','Y']))
             self.num_repeats = sum(map(self.f_seq.count, ['AA','TT', 'CC', 'GG'])) + sum(map(self.r_seq.count, ['AA','TT', 'CC', 'GG']))
+            
+            current_action = print_runtime(f'Received ePCR results for <F: {self.f_seq}> and <R: {self.r_seq}>.')
+            log_and_print(current_action, 0, self.args, self.run_info)
 
+            browser.close()
+            current_action = print_warning(f'Closed browser instance of BiSearch ePCR.')
+            log_and_print(current_action, 2, self.args, self.run_info)
             return (
                 self.strand,
                 self.score,
@@ -358,6 +448,17 @@ class BiSearch_condition:
                 self.amp_length,
                 self.CpG_count,
 
+                self.f_self_anneal,
+                self.f_self_end_anneal,
+
+                self.r_self_anneal,
+                self.r_self_end_anneal,
+
+                self.pair_anneal,
+                self.pair_end_anneal,
+
+                self.primer_info_link,
+
                 self.primer_binds[0],
                 self.primer_binds[1],
                 self.PCR_products_p,
@@ -372,160 +473,301 @@ class BiSearch_condition:
                 self.num_degen_bases,
                 self.num_repeats
             )
-
     def do_BiSearch_primer_design(self) -> list:
         """
-        Performs BiSearch primer design and retrieves results.
+        Function to automatically perform BiSearch Primer design and retrieve results.
+
+        Parameters:
+            self: the instance of the BiSearch conditions
+        
+        Returns:
+            (list) of primers designed by BiSearch Primer design 
         """
 
         # initialize browser instance for BiSearch ePCR, select form, fill in form according to class variables
         browser = mechanicalsoup.StatefulBrowser(soup_config={'features': 'lxml'})
+        
+        # Maybe wait a bit before starting a new instance
+        if not self.args.ignore_rate_lim:
+            current_action = print_runtime(f'Performing necessary rate-limiting for initial primer design ...')
+            log_and_print(current_action, 3, self.args, self.run_info)
+            time.sleep(60)
+            current_action = print_runtime(f'Rate-limiting done.')
+            log_and_print(current_action, 3, self.args, self.run_info)
+
+        current_action = print_runtime(f'Opened BiSearch browser instance.')
+        log_and_print(current_action, 2, self.args, self.run_info)
+
         browser.open("http://bisearch.enzim.hu/?m=search")
         browser.select_form('form[action="?run"]')
         list(map(browser.form.set, self.BiSearch_form_mapping, self.summary_conditions, (True,)*len(self.summary_conditions)))
+        current_action = print_runtime(f'Submitting request to BiSearch ...')
+        log_and_print(current_action, 0, self.args, self.run_info)
         browser.submit_selected()
 
         # translate HTML into something that pandas can read -- essentially gets rid of unnecessary form settings
-        HTML_string = str(browser.get_current_page().find_all('table')[11])
+        BiSearchTable = browser.get_current_page().find_all('table')[11]
+        HTML_string = str(BiSearchTable)
         for r in (('<form action="?run" method="post">', ''),
                 ('</form>', ''),
                 ('<input name="prg" type="hidden" value="cgi/fpcr.cgi"/>', ''),
                 ('<tr class="r1">', '<tr>'),
                 ('<tr class="r2">', '<tr>')):
             HTML_string = HTML_string.replace(*r)
+
+        current_action = print_runtime(f'Received table of primer results from BiSearch.')
+        log_and_print(current_action, 1, self.args, self.run_info)
+
+        list_of_primer_info_links = []
+        for tr in BiSearchTable.findAll('tr'):
+            trs = tr.findAll('td')
+            for each in trs:
+                try:
+                    if str(each.find('a')['href']).startswith('index.php'):
+                        primer_info_link_str = 'http://bisearch.enzim.hu/'+ str(each.find('a')['href'])
+                        list_of_primer_info_links.append(primer_info_link_str)
+                        list_of_primer_info_links.append(' ')
+                    else:
+                        pass
+                except:
+                    pass
+
+        current_action = print_runtime(f'Processed hyperlinks for primer-dimer information.')
+        log_and_print(current_action, 1, self.args, self.run_info)
+
         BiSearch_Results = pd.read_html(HTML_string, skiprows=1)[0]
+
+        current_action = print_runtime(f'Processing table of primer results ...')
+        log_and_print(current_action, 1, self.args, self.run_info)
 
         # check if the results page is a legitimate table of primer results -- if there aren't 14 columns, there weren't any results
         if BiSearch_Results.shape[1] > 1:
             for row_i, _ in BiSearch_Results[::2].iterrows():
                 x = BiSearch_Results.iloc
 
-                # This is just some webscraping laziness
-                score = x[row_i, 1]						# primer score, as scored by BiSearch
-                strand = self.strand                    # strand
-                f_seq = x[row_i, 2]                     # sequence of the foward primer
-                f_length = len(x[row_i, 2])             # length of the foward primer
-                f_GC = x[row_i, 5]                      # %GC of the foward primer
-                f_Tm = x[row_i, 6]                      # T_m of the foward primer
+                try:
+                    # This is just some webscraping laziness
+                    score = x[row_i, 1]                     # primer score, as scored by BiSearch
+                    strand = self.strand                    # strand
+                    
+                    f_seq = x[row_i, 2]                     # sequence of the foward primer
+                    f_length = len(x[row_i, 2])             # length of the foward primer
+                    f_GC = x[row_i, 5]                      # %GC of the foward primer
+                    f_Tm = x[row_i, 6]                      # T_m of the foward primer
 
-                r_seq = x[row_i + 1, 2]                 # sequence of the reverse primer
-                r_length = len(x[row_i + 1, 2])         # length of the reverse primer
-                r_GC = x[row_i + 1, 5]                  # %GC of the reverse primer
-                r_Tm = x[row_i + 1, 6]                  # T_m of the reverse primer
+                    r_seq = x[row_i + 1, 2]                 # sequence of the reverse primer
+                    r_length = len(x[row_i + 1, 2])         # length of the reverse primer
+                    r_GC = x[row_i + 1, 5]                  # %GC of the reverse primer
+                    r_Tm = x[row_i + 1, 6]                  # T_m of the reverse primer
 
-                amp_start = x[row_i, 3]                 # start of amplicon
-                amp_end = (x[row_i + 1, 3])+2           # end of amplicon
-                amp_length = (amp_end - amp_start)-1    # length of amplicon
-                CpG_count = int(x[row_i, 8])            # number of CpG
+                    amp_start = x[row_i, 3]                 # start of amplicon
+                    amp_end = (x[row_i + 1, 3]) + 2         # end of amplicon
+                    amp_length = (amp_end - amp_start) - 1  # length of amplicon
+                    CpG_count = int(x[row_i, 8])            # number of CpG
 
-                self.primers_list.append(self.BiSearch_primer(strand, score, f_seq, f_length, f_GC, f_Tm, r_seq, r_length, r_GC, r_Tm, amp_start, amp_end, amp_length, CpG_count))
+                    try:
+                        f_self_anneal = int(str(x[row_i, 9]).strip())           # forward primer self annealing
+                        f_self_end_anneal = int(str(x[row_i, 10]).strip())      # forward primer self end-annealing
 
+                        r_self_anneal = int(str(x[row_i + 1, 9]).strip())       # reverse primer self annealing
+                        r_self_end_anneal = int(str(x[row_i + 1, 10]).strip())  # reverse primer self end-annealing
+                    except:
+                        current_action = print_warning(f'Failed to retrieve primer self-annealing information!')
+                        log_and_print(current_action, 0, self.args, self.run_info)
+
+                    try:
+                        pair_anneal = int(str(x[row_i, 11]).strip())        # primer pair self annealing
+                        pair_end_anneal = int(str(x[row_i, 12]).strip())    # primer pair self end-annealing
+                    except:
+                        current_action = print_warning(f'Failed to retrieve primer pair self-annealing information!')
+                        log_and_print(current_action, 0, self.args, self.run_info)
+
+                    try:
+                        primer_info_link = list_of_primer_info_links[row_i]
+                    except:
+                        current_action = print_warning(f'Failed to process hyperlink information!')
+                        log_and_print(current_action, 0, self.args, self.run_info)
+                except:
+                    current_action = print_warning(f'An error occurred in table processing!')
+                    log_and_print(current_action, 0, self.args, self.run_info)
+
+                    current_action = print_warning(
+                        x[row_i, 1],
+                        self.strand,
+                        x[row_i, 2],
+                        len(x[row_i, 2]),
+                        x[row_i, 5],
+                        x[row_i, 6],
+                        x[row_i + 1, 2],
+                        len(x[row_i + 1, 2]),
+                        x[row_i + 1, 5],
+                        x[row_i + 1, 6],
+                        x[row_i, 3],
+                        (x[row_i + 1, 3]) + 2,
+                        (amp_end - amp_start) - 1,
+                        int(x[row_i, 8]),
+                        int(str(x[row_i, 9]).strip()),
+                        int(str(x[row_i, 10]).strip()),
+                        int(str(x[row_i + 1, 9]).strip()),
+                        int(str(x[row_i + 1, 10]).strip()),
+                        int(str(x[row_i, 11]).strip()),
+                        int(str(x[row_i, 12]).strip()),
+                    )
+                    log_and_print(current_action, 0, self.args, self.run_info)
+
+                try:
+                    self.primers_list.append(
+                        self.BiSearch_primer(self.args, self.run_info, strand, score, f_seq, f_length, f_GC, f_Tm, r_seq, r_length, r_GC, r_Tm, amp_start, amp_end, amp_length, CpG_count, f_self_anneal, f_self_end_anneal, r_self_anneal, r_self_end_anneal, pair_anneal, pair_end_anneal, primer_info_link)
+                    )
+                except:
+                    current_action = print_warning(f'An error occurred in appending the primer to the list!')
+                    log_and_print(current_action, 0, self.args, self.run_info)
+
+        current_action = print_warning(f'Processed table of primer results.')
+        log_and_print(current_action, 0, self.args, self.run_info)
         browser.close()
+        current_action = print_warning(f'Closed browser instance of BiSearch Primer Design.')
+        log_and_print(current_action, 2, self.args, self.run_info)
         return self.primers_list
-
 # --------------------------------------------------
 def main() -> None:
     """ Do the thing """
 
     args = get_args()
 
-    fasta_file_path_arg = args.fasta_file_path.resolve()
-    output_path, bis_arg, strand_arg, max_arg, sub_arg, tries_arg  = args.output_dir, args.bis, args.strand, args.max, args.sub, args.tries
+    # generate an output file
+    output_path = pathlib.Path.resolve(args.output_path)
+    output_path.mkdir(parents=True, exist_ok=True)
 
-    verbose_arg, seed_arg = args.verbose, args.seed
-    random.seed(seed_arg)
+    # run info
+    run_info = time.strftime("%Y_%m_%d_%H%M%S", time.localtime(time.time()))
+ 
+    # generate params file
+    generate_log_file(output_path, run_info, args)
 
-    print_runtime('Started job')
-
-    # check output_dir flag, if true: make an output dir
-    #if output_dir_arg:
-    #    output_flag = 'BiSearch_primer_design'
-    #    output_path_string = f'{output_flag}-output-{time.strftime("%Y_%m_%d_%H%M%S", time.localtime(time.time()))}'
-    #    output_path = fasta_file_path_arg.joinpath(output_path_string)
-    #    output_path.mkdir(parents=True, exist_ok=True)
-    #else:
-    #    output_path = fasta_file_path_arg.parent
-
-    # generate params
-    generate_params_file(output_path, get_args())
-    if verbose_arg > 0 : print_runtime('Created params.txt file')
-
-    # generate and do
-    list_of_fasta_files = []
-
-    if fasta_file_path_arg.is_file():
-        list_of_fasta_files = [fasta_file_path_arg]
-    elif fasta_file_path_arg.is_dir():
-        list_of_fasta_files = [fasta_file for fasta_file in fasta_file_path_arg.glob('*.fasta')]
+    # generate a list of files to iterate through
+    if args.input_path.is_file():
+        list_of_fasta_files = [args.input_path]
+        # logging information
+        current_action = print_runtime(f'Input path to file was used and found: {args.input_path.name}')
+        log_and_print(current_action, 1, args, run_info)
+    elif args.input_path.is_dir():
+        list_of_fasta_files = [fasta_file for fasta_file in args.input_path.glob('*.fasta')]
+        # logging information
+        current_action = print_runtime(f'Input path to directory was used and found: {[fasta_file.name for fasta_file in list_of_fasta_files]}')
+        log_and_print(current_action, 1, args, run_info)
 
     compiled_primers_total = {}
     for fasta_file in list_of_fasta_files:
-        if verbose_arg > 0 : print_runtime(f'Generating BiSearch conditions for {fasta_file.name}')
+        # logging information
+        current_action = print_runtime(f'Generating BiSearch conditions for {fasta_file.name} ...')
+        log_and_print(current_action, 0, args, run_info)
 
         query_sequence = SeqIO.read(fasta_file, "fasta")
-        fasta_subseqs = generate_subseqs(query_sequence, sub_arg, max_arg+200)
+        fasta_subseqs = generate_subseqs(query_sequence, args.sub, args.max+200)
+        
+        # logging information
+        current_action = print_runtime(f'Generating subsequences to try for {fasta_file.name}...')
+        log_and_print(current_action, 1, args, run_info)
 
         subsequence_list = []
         for subseq_i in fasta_subseqs.keys():
+            tries_arg = args.tries
             if tries_arg > len(fasta_subseqs[subseq_i].values()):
-                if verbose_arg > 1 : print_runtime(f'!!! WARNING !!! : \nSplitting the FASTA into {tries_arg} tries in {len(fasta_subseqs.keys())} x {max_arg+200} bp subsequences isn\'t useful. The query region will overlap into the other regions anyway.')
+                # logging information
+                current_action = print_warning(f'Splitting the FASTA into {tries_arg} tries in {len(fasta_subseqs.keys())} x {args.max+200} bp subsequences isn\'t useful. The query region will overlap into the other regions anyway.')
+                log_and_print(current_action, 2, args, run_info)
+                
                 while tries_arg > len(fasta_subseqs[subseq_i].values()):
                     tries_arg -= 1
-                if verbose_arg > 1 : print_runtime(f'Rounded down to {tries_arg} tries in {len(fasta_subseqs.keys())} regions to avoid this.')
+                current_action = print_runtime(f'Rounded down to {tries_arg} tries in {len(fasta_subseqs.keys())} regions to avoid this.')
+                log_and_print(current_action, 2, args, run_info)
             subsequence_list += random.choices(list(fasta_subseqs[subseq_i].values()), k=tries_arg)
-        if verbose_arg > 1 : print_runtime(f'Generated {len(subsequence_list)} stepwise subsequence(s) to try')
-
+        # logging information
+        current_action = print_runtime(f'Generated {len(subsequence_list)} stepwise subsequence(s) to try.')
+        log_and_print(current_action, 1, args, run_info)
+    
         list_of_conditions = []
         for subsequence in subsequence_list:
-            if verbose_arg > 1 : print_runtime('Sending conditions to BiSearch (could take up to 15 min...)')
-            if bis_arg and not strand_arg:
-                list_of_conditions.append(BiSearch_condition(
+            if int(subsequence['start']) < 20:
+                subsequence['start'] = subsequence['start'] + 20
+                subsequence['end'] = subsequence['end'] + 20
+            if args.bis and not args.strand:
+                try:
+                    pos_strand_conditions = BiSearch_condition(
+                        args=args,
+                        run_info=run_info,
                         sequence = query_sequence,
                         reverse_start = subsequence['start'],
                         forward_end = subsequence['end'],
-                        bisulfite = bis_arg,
+                        bisulfite = args.bis,
                         strand = 'p',
-                        ).do_BiSearch_primer_design()
-                    )
-                list_of_conditions.append(BiSearch_condition(
+                        )
+                    neg_strand_conditions = BiSearch_condition(
+                        args=args,
+                        run_info=run_info,
                         sequence = query_sequence,
                         reverse_start = subsequence['start'],
                         forward_end = subsequence['end'],
-                        bisulfite = bis_arg,
+                        bisulfite = args.bis,
                         strand = 'm',
-                        ).do_BiSearch_primer_design()
-                    )
-            else:
-                list_of_conditions.append(BiSearch_condition(
+                        )
+                    current_action = print_runtime(f'Generated BiSearch conditions for the (+) and (-) strands.')
+                    log_and_print(current_action, 0, args, run_info)
+
+                    current_action = print_runtime(f'Trying the conditions for the (+) strand ...')
+                    log_and_print(current_action, 0, args, run_info)
+                    condition = pos_strand_conditions.do_BiSearch_primer_design()
+                    list_of_conditions.append(condition)
+                    
+                    current_action = print_runtime(f'Trying the conditions for the (-) strand ...')
+                    log_and_print(current_action, 0, args, run_info)
+                    condition = neg_strand_conditions.do_BiSearch_primer_design()
+                    list_of_conditions.append(condition)
+
+                except IndexError:
+                    current_action = print_warning(f'An error occurred when processing BiSearch conditions for (+) and (-) strands!')
+                    log_and_print(current_action, 0, args, run_info)
+            elif args.bis and args.strand:
+                try:
+                    condition = BiSearch_condition(
+                        args=args,
+                        run_info=run_info,
                         sequence = query_sequence,
                         reverse_start = subsequence['start'],
                         forward_end = subsequence['end'],
-                        bisulfite = bis_arg,
-                        strand = strand_arg,
-                        ).do_BiSearch_primer_design()
-                    )
+                        bisulfite = args.bis,
+                        strand = args.strand,
+                        )
+                    current_action = print_runtime(f'Generated BiSearch conditions for the {args.strand} strand.')
+                    log_and_print(current_action, 0, args, run_info)
 
-            if verbose_arg > 1 : print_runtime('Received results from BiSearch')
-
+                    current_action = print_runtime(f'Trying the current BiSearch condition ...')
+                    log_and_print(current_action, 0, args, run_info)
+                    list_of_conditions.append(condition.do_BiSearch_primer_design())
+        
+                except IndexError:
+                    current_action = print_warning(f'An error occurred when processing BiSearch conditions for {args.strand} strand!')
+                    log_and_print(current_action, 0, args, run_info)
+    
         compiled_primers_for_fasta = []
         for primer_condition in list_of_conditions:
             for BiSearch_primer in primer_condition:
-                if verbose_arg > 2 : print_runtime(f'Performed BiSearch ePCR with {BiSearch_primer}')
+                if args.verbose > 2 : print_runtime(f'Performed BiSearch ePCR with {BiSearch_primer}')
                 compiled_primers_for_fasta.append(BiSearch_primer.do_BiSearch_ePCR())
 
         compiled_primers_total.update({fasta_file.stem: compiled_primers_for_fasta})
 
-    for fasta in compiled_primers_total:
-        generate_primers_csv(compiled_primers_total[fasta], fasta, output_path)
-        print_runtime(f'Output .csv files containing primers for {fasta}.fasta')
+        generate_primers_csv(compiled_primers_for_fasta, fasta_file.stem, output_path)
+        current_action = print_runtime(f'Generated .csv files containing primers for {fasta_file}.fasta .')
+        log_and_print(current_action, 0, args, run_info)
     
-    print_runtime(f'Finished job')
-
-def generate_primers_csv(data, csv_name, output_path_arg) -> None:
+    current_action = print_runtime(f'Finished job.')
+    log_and_print(current_action, 0, args, run_info)
+def generate_primers_csv(data, csv_name, output_path) -> None:
     """
     Function outputs BiSearch-generated primers to .csv
     """
-
     pd.DataFrame(data,
             columns=[
                 'strand',           # primer strand, 'p' = sense, 'm' = antisense
@@ -546,6 +788,17 @@ def generate_primers_csv(data, csv_name, output_path_arg) -> None:
                 'amp_size',         # size of amplicon
                 'CpG_count',        # number of CpG
 
+                'f_self_anneal',    # self annealing of the forward primer
+                'f_self_end_anneal',# self end-annealng of the forward primer
+
+                'r_self_anneal',    # self annealing of the reverse primer
+                'r_self_end_anneal', # self end-annealing of the reverse primer
+
+                'pair_anneal',      # pair annealing
+                'pair_end_anneal',  # pair end-annealing
+
+                'primer_info_link', # the link containing the primer info
+
                 'f_bind (+)',       # number of forward primer binds on (+) strand
                 'r_bind (+)',       # number of reverse primer binds on (+) strand
                 'PCR_products (+)', # number of PCR products on (+) strand
@@ -559,9 +812,8 @@ def generate_primers_csv(data, csv_name, output_path_arg) -> None:
                 'end',              # end pos in chromosome
 
                 'degen_bases',      # number of degenerate bases in the primer sequences
-                'repeats',          # number of repeats in the primer sequences
-                ]).to_csv(output_path_arg.joinpath(f'{csv_name}.csv'))
-
+                'repeats'           # number of repeats in the primer sequences
+                ]).to_csv(output_path.joinpath(f'{csv_name}.csv'))
 def generate_subseqs(sequence, subseq_num, frame_length) -> dict:
     """
     Function will find subsequences of a given length within a fasta file.
@@ -587,26 +839,34 @@ def generate_subseqs(sequence, subseq_num, frame_length) -> dict:
         subseq_data.update({subseq_count: subseq_list})
 
     return subseq_data
-
-def generate_params_file(output_path, args) -> None:
-    """ Generates parameter files. """
-    with open(output_path.joinpath(f'params-{time.strftime("%Y_%m_%d_%H%M%S", time.localtime(time.time()))}.txt'), 'w', encoding='UTF-8') as params_file:
+def log_and_print(action_arg, verbosity_arg, args, run_info) -> None:
+    """ Log the current action and print it if the verbosity is high enough """
+    with open(pathlib.Path.resolve(args.output_path).joinpath(f'log-{run_info}.txt'), 'a', encoding='UTF-8') as log_file:
+        log_file.write(f'\n{action_arg}')
+    if args.verbose > verbosity_arg - 1 : print(action_arg)
+def generate_log_file(output_path, run_info, args) -> None:
+    """ Generates log file. """
+    with open(output_path.joinpath(f'log-{run_info}.txt'), 'w', encoding='UTF-8') as log_file:
         output_vars = [
-            f'input={args.fasta_file_path.resolve()}',
-            f'output_dir={args.output_dir}',
+            f'input={args.input_path.resolve()}',
+            f'output_dir={args.output_path.resolve()}',
             f'bis={args.bis}',
             f'strand={args.strand}',
             f'max_PCR_len={args.max}',
             f'n_subseq={args.sub}',
             f'n_tries={args.tries}',
+            f'ignore_rate_lim={args.ignore_rate_lim}',
             f'verbose={args.verbose}',
             f'seed={args.seed}']
-        params_file.write('\n'.join(output_vars))
-
+        log_file.write('\n'.join(output_vars))
+        log_file.write('\n')
+    print(print_runtime(f"Created log file in {output_path} ."))
+def print_warning(action) -> None:
+    """ Return the time and a warning. """
+    return f'\n[{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}] !!! WARNING !!! :\n{action}'
 def print_runtime(action) -> None:
-    """ Print the time and some defined action. """
-    print(f'[{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}] {action}')
-
+    """ Return the time and some defined action. """
+    return f'[{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}] {action}'
 # --------------------------------------------------
 if __name__ == '__main__':
     main()

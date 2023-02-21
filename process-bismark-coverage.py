@@ -4,11 +4,6 @@ import pandas as pd
 import csv
 from collections import namedtuple
 
-class CoverageHandler(): 
-    #TODO: FILL OUT THIS CLASS WITH THE FUNCTION IN MAIN()
-    def __init__(self, coverage_path, primer_path): 
-        pass
-
 def parse_args(): 
     parser = argparse.ArgumentParser("Script to analyze the coverage files")
     parser.add_argument(
@@ -85,7 +80,7 @@ def main():
         region_df.loc[:,'basecall'] = basecalls
         #Check if the current primer set is on the positive or negative strand
         strand = True
-        if primer.primer.split('-')[1][0:3] == 'BSN':  
+        if (primer.primer.split('-')[1][0:3] == 'BSN') or (primer.primer.split('-')[1][0:2] == 'BN'):  
             strand = False
         if strand is True: 
             primer_df = region_df.loc[region_df['basecall']=='C']

@@ -3,24 +3,21 @@
 #Main directories
 data=../data
 results=../results
-
 #Trimming and QC
-trimmed=$results/trimmed_bam
+trimmed=$results/trimmed_fastq
 fastqc=$results/fastqc
 pre_trim_fastqc=$fastqc/pre_trim
 post_trim_fastqc=$fastqc/post_trim
 #conda_env needs to be changed to the correct location for the environment you're using
 conda_env=~/miniconda3/envs/ngs/share/trimmomatic-0.39-2
-
 #Bismark
 bismark=$results/bismark
-
 mapped=$bismark/mapped_bam
 filter_incomplete=$bismark/incomplete_conv_bam
 index=$bismark/indexed_bam
 all_index=$index/nonCG_filtered
 filtered_index=$index/CG_filtered
-
+#Bismark methylation extraction
 methylation_extraction=$bismark/methylation_extraction
 all_extracted=$methylation_extraction/nonCG_filtered
 filtered_extracted=$methylation_extraction/CG_filtered
@@ -107,5 +104,3 @@ while IFS= read -r prefix; do
         -o $filtered_extracted \
         $mapped/"$prefix"_1_bismark_bt2_pe.bam
 done < $data/ngs_samplelist.txt
-
-#STEP 5: GENERATE REPORTS

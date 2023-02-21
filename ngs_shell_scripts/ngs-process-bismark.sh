@@ -19,5 +19,3 @@ done
 mv $detailed/*_summary.csv $sample_summary
 
 python ./assess-by-primer.py $sample_summary --output $primer_summary
-
-

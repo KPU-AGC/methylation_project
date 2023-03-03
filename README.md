@@ -20,7 +20,7 @@ The semen donors were genotyped at each target site. The genotyping calls allow 
 
 The sequencing instrument was the SeqStudio, using BigDye Terminator v3.1 chemistry. ab1 files were quality controlled and filtered using [sanger_qc.py](https://github.com/KPU-AGC/general-resources/blob/main/sanger-processing/sanger_qc.py) and [sanger-sequence-trim.py](https://github.com/KPU-AGC/general-resources/blob/main/sanger-processing/sanger_sequence_trim.py). 
 
-[tracy](https://www.gear-genomics.com/docs/tracy/) was the command-line program that was used to generate genotyping calls for each ab1 file. There is a [software-assisted genotyping program](https://github.com/KPU-AGC/batch-genotyping) that we generated to QC tracy's genotype calls. 
+[tracy](https://www.gear-genomics.com/docs/tracy/) was the command-line program that was used to generate genotyping calls for each ab1 file. There is a [software-assisted genotyping program](https://github.com/KPU-AGC/batch-genotyping) that we created to QC tracy's genotype calls. 
 
 ### Bisulfite PCR amplification of samples 
 Bisulfite PCR amplification is done for each target site for each sample. Both a singleplex and multiplex set up is currently being evaluated. Success of the PCRs was evaluated using agarose gel electrophoresis. Each agarose gel image of all of the PCRs is processed using the [GelAnalyzer](http://www.gelanalyzer.com/) software. The relative quantity of each target amplicon was determined by assessing its band's thickness and intensity in the gel image. The target amplicons were normalized and pooled together based on their relative quantity. A gel excision cleanup was used to separate the target size range from the incorrectly sized non-specific product. 

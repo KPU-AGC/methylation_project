@@ -1,4 +1,6 @@
 #!/bin/bash
+#get-fasta.sh : scripts to extract individual fasta sequences from a genome at specified genomic coordinates. 
+
 #Set correct directories
 #CHANGE genome and output_name TO FIT WHAT YOU NEED
 data=../data

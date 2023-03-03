@@ -1,4 +1,6 @@
 #!/bin/bash
+#ngs-methylation-extraction.sh : script to run Bismark Methylation Extractor on bam files
+
 #Set correct directories
 data=../data
 results=../results

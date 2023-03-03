@@ -1,4 +1,6 @@
 #!/bin/bash
+#ngs-qc.sh : script to run fastqc on everything.
+
 #Set correct directories
 data=../data
 results=../results

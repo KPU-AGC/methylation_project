@@ -1,4 +1,6 @@
 #!/bin/bash
+#ngs-index.sh : shell script to sort BAM files to prepare them for generating bedgraph files. 
+
 #Set correct directories
 data=../data
 results=../results

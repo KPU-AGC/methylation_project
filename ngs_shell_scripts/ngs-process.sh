@@ -42,7 +42,7 @@ bisulfite_genome=$1
 [ ! -d $post_trim_fastqc ] && mkdir -p $post_trim_fastqc
 
 #Get fastqc results for pre-trim files
-fastqc -t 16 -outdir $pre_trim_fastqc $data/*
+fastqc -t 16 -outdir $pre_trim_fastqc $data/*.fastq
 
 #Pipeline for getting the sample name prefixes
 #ls $data | grep fastq | sed s/_R1_001.fastq//g | sed s/_R2_001.fastq//g | sed s/_.*//g | sort | uniq > $data/ngs_samplelist.txt

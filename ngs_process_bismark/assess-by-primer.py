@@ -27,7 +27,7 @@ def import_seq_counts(nom_path: pathlib.Path) -> dict:
     
     return seq_counts
 
-def import_bisulfite_data(input_dir: pathlib.Path, seq_counts) -> dict: 
+def import_bisulfite_data(input_dir: pathlib.Path, seq_counts: dict, num_nom: int) -> dict: 
 
     data = dict()
     data_df = dict()
@@ -59,8 +59,8 @@ def import_bisulfite_data(input_dir: pathlib.Path, seq_counts) -> dict:
         mean_coverage = csv_data['coverage'].mean()
         std_coverage = csv_data['coverage'].std()
         if seq_counts:
-            norm_coverage = (mean_coverage/seq_counts[sample_name])*30000
-            norm_std_coverage = (std_coverage/seq_counts[sample_name])*30000
+            norm_coverage = (mean_coverage/seq_counts[sample_name])*num_nom
+            norm_std_coverage = (std_coverage/seq_counts[sample_name])*num_nom
         else: 
             norm_coverage = mean_coverage/1
             norm_std_coverage = std_coverage/1
@@ -87,6 +87,7 @@ def import_bisulfite_data(input_dir: pathlib.Path, seq_counts) -> dict:
 def output_primer_summaries(data: dict, output_dir: pathlib.Path, tag: str) -> None: 
     '''Output primer summaries for each primer DataFrame'''
     
+    #Per-primer summary
     for primer in data: 
         #Generate output path
         if tag: 
@@ -164,6 +165,15 @@ def parse_args():
         type=str,
         help='Optional prefix to all files generated.'
     )
+    parser.add_argument(
+        '-c',
+        '--nom_count',
+        dest='num_nom',
+        action='store',
+        default=30000,
+        type=int,
+        help='Number of reads to normalize to. Default=30000'
+    )
 
     args = parser.parse_args()
 
@@ -182,7 +192,7 @@ def main():
         seq_counts = []
 
     #Populate CSV paths with csvs for each site
-    data = import_bisulfite_data(args.input_path, seq_counts)
+    data = import_bisulfite_data(args.input_path, seq_counts, args.num_nom)
 
     #Output - DataFrame outputs
     output_primer_summaries(data, args.output_path, args.tag)

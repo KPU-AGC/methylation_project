@@ -1,3 +1,14 @@
+"""
+assess-by-primer.py - script for calculating coverage box plots for each primer site. 
+
+Functions
+---------
+import_seq_counts : from .csv file, get number of post-processing sequences for each sample
+import_bisulfite_data : import data from sample-primer.csv output of process-ngs-coverage.
+output_primer_summaries : output .csv files for each primer with summary statistics
+generate_figure : generate box plot image
+
+"""
 from matplotlib import pyplot
 import argparse
 import pathlib
@@ -5,7 +16,7 @@ import pandas as pd
 import numpy as np
 import csv
 
-def import_seq_counts(nom_path: pathlib.Path): 
+def import_seq_counts(nom_path: pathlib.Path) -> dict: 
     '''Import the total sequence counts after mapping and filtering per sample.'''
     seq_counts = dict()
 
@@ -16,7 +27,7 @@ def import_seq_counts(nom_path: pathlib.Path):
     
     return seq_counts
 
-def import_bisulfite_data(input_dir: pathlib.Path, seq_counts): 
+def import_bisulfite_data(input_dir: pathlib.Path, seq_counts) -> dict: 
 
     data = dict()
     data_df = dict()
@@ -50,6 +61,9 @@ def import_bisulfite_data(input_dir: pathlib.Path, seq_counts):
         if seq_counts:
             norm_coverage = (mean_coverage/seq_counts[sample_name])*30000
             norm_std_coverage = (std_coverage/seq_counts[sample_name])*30000
+        else: 
+            norm_coverage = mean_coverage/1
+            norm_std_coverage = std_coverage/1
 
         #Add data to appropriate list in dictionary (based on primer)
         row_data = [
@@ -58,25 +72,28 @@ def import_bisulfite_data(input_dir: pathlib.Path, seq_counts):
             std_methylation,
             mean_coverage,
             std_coverage,
+            norm_coverage,
+            norm_std_coverage,
         ]
-
-        if seq_counts: 
-            row_data.append(norm_coverage)
-            row_data.append(norm_std_coverage)
 
         data[primer_name].append(row_data)
 
     #Conversion to DataFrames
-    for key in data: 
-        data_df[key] = pd.DataFrame(data[key], columns=labels)
+    for primer in data: 
+        data_df[primer] = pd.DataFrame(data[primer], columns=labels)
 
     return data_df
 
-def output_primer_summaries(data: dict, output_dir: pathlib.Path): 
+def output_primer_summaries(data: dict, output_dir: pathlib.Path, tag: str) -> None: 
     '''Output primer summaries for each primer DataFrame'''
     
     for primer in data: 
-        output_path = output_dir.joinpath(f'{primer}_summary.csv')
+        #Generate output path
+        if tag: 
+            output_path = output_dir.joinpath(f'{tag}_{primer}_summary.csv')
+        else: 
+            output_path = output_dir.joinpath(f'{primer}_summary.csv')
+        #Output
         with open(output_path, 'w', newline='') as output_file: 
             data[primer].to_csv(
                 output_file, 
@@ -84,43 +101,33 @@ def output_primer_summaries(data: dict, output_dir: pathlib.Path):
                 index=False,
             )
 
-def output_primer_summaries_old(data: dict, output_path: pathlib.Path): 
-    '''Output primer summaries'''
-    for primer in data: 
-        output_path = output_path.joinpath(f'{primer}_summary.csv')
-        with open(output_path, 'w', newline='') as csv_file:
-            csv_writer = csv.writer(csv_file)
-            csv_writer.writerow(
-                (
-                    'sample_name',
-                    'mean_methylation',
-                    'std_methylation',
-                    'mean_coverage',
-                    'std_coverage',
-                    'normalized_mean_coverage',
-                    'normalized_std_coverage',
-                )
-            )
-            csv_writer.writerows(data[primer])
-
-def generate_figure(data: dict, output_path: pathlib.Path): 
-    ''''''
+def generate_figure(data: dict, output_path: pathlib.Path, tag: str) -> None: 
+    '''Create box plot'''
+    
     fig, axe = pyplot.subplots()
     
     id_list = []
     data_list = []
 
     #Add data to a list
-    for key in data: 
-        norm_coverage_series = data[key]['norm_coverage']
-        id_list.append(f'{key} (n={str(norm_coverage_series.size)})')
+    for primer in data: 
+        norm_coverage_series = data[primer]['norm_coverage']
+        id_list.append(f'{primer} (n={str(norm_coverage_series.size)})')
         data_list.append(norm_coverage_series)
 
+    #Layout parameters
     axe.boxplot(data_list, labels=id_list)
     pyplot.xticks(rotation='vertical')
     pyplot.tight_layout()
+
     #pyplot.show()
-    fig_path = output_path.joinpath(f'primer_boxplot_summary.png')
+
+    #Generate output path
+    if tag:
+        fig_path = output_path.joinpath(f'{tag}_primer_boxplot_summary.png')
+    else:
+        fig_path = output_path.joinpath(f'primer_boxplot_summary.png')
+
     fig.savefig(fig_path, transparent=False, dpi=300)
 
 def parse_args(): 
@@ -149,6 +156,14 @@ def parse_args():
         type=pathlib.Path,
         help='Path to file containing sample names and final mapped sequence count after filtering.'
     )
+    parser.add_argument(
+        '-t',
+        '--tag',
+        dest='tag',
+        default='',
+        type=str,
+        help='Optional prefix to all files generated.'
+    )
 
     args = parser.parse_args()
 
@@ -156,7 +171,6 @@ def parse_args():
         args.output_path = args.input_path
     
     return args
-
 
 def main(): 
     args = parse_args()
@@ -171,9 +185,9 @@ def main():
     data = import_bisulfite_data(args.input_path, seq_counts)
 
     #Output - DataFrame outputs
-    output_primer_summaries(data, args.output_path)
+    output_primer_summaries(data, args.output_path, args.tag)
 
-    generate_figure(data, args.output_path)
+    generate_figure(data, args.output_path, args.tag)
 
 if __name__ == '__main__': 
     main()

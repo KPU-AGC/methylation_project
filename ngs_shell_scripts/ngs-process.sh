@@ -24,12 +24,12 @@ bismark=$results/bismark
 mapped=$bismark/mapped_bam
 filter_incomplete=$bismark/incomplete_conv_bam
 index=$bismark/indexed_bam
-all_index=$index/nonCG_filtered
-filtered_index=$index/CG_filtered
+all_index=$index/all_sequences
+filtered_index=$index/nonCG_filtered
 #Bismark methylation extraction
 methylation_extraction=$bismark/methylation_extraction
-all_extracted=$methylation_extraction/nonCG_filtered
-filtered_extracted=$methylation_extraction/CG_filtered
+all_extracted=$methylation_extraction/all_sequences
+filtered_extracted=$methylation_extraction/nonCG_filtered
 
 #Default: /data/ref/genomes/arsucd1.2/slugger-masked
 bisulfite_genome=$1
@@ -88,15 +88,15 @@ mv -t $filter_incomplete $mapped/*nonCG_filtered* $mapped/*.non-conversion_filte
 [ ! -d $index ] && mkdir -p $index
 [ ! -d $all_index ] && mkdir -p $all_index
 [ ! -d $filtered_index ] && mkdir -p $filtered_index
-#Non-filtered - BAM sequences need to be sorted before being indexed
+#Filtered - BAM sequences need to be sorted before being indexed
 while IFS= read -r prefix; do
-    samtools sort $filter_incomplete/"$prefix"_1_bismark_bt2_pe.nonCG_filtered.bam -o $all_index/"$prefix".nonCG_filtered.sorted.bam
-    samtools index $all_index/"$prefix".nonCG_filtered.sorted.bam
+    samtools sort $filter_incomplete/"$prefix"_1_bismark_bt2_pe.nonCG_filtered.bam -o $filtered_index/"$prefix".nonCG_filtered.sorted.bam
+    samtools index $filtered_index/"$prefix".nonCG_filtered.sorted.bam
 done < $data/ngs_samplelist.txt
-#Filtered
+#Not filtered
 while IFS= read -r prefix; do
-    samtools sort $mapped/"$prefix"_1_bismark_bt2_pe.bam -o $filtered_index/"$prefix".sorted.bam
-    samtools index $filtered_index/"$prefix".sorted.bam
+    samtools sort $mapped/"$prefix"_1_bismark_bt2_pe.bam -o $all_index/"$prefix".sorted.bam
+    samtools index $all_index/"$prefix".sorted.bam
 done < $data/ngs_samplelist.txt
 
 #STEP 4: METHYLATION EXTRACTION
@@ -106,17 +106,6 @@ done < $data/ngs_samplelist.txt
 [ ! -d $all_extracted ] && mkdir -p $all_extracted
 [ ! -d $filtered_extracted ] && mkdir -p $filtered_extracted
 
-#Non-filtered
-while IFS= read -r prefix; do
-    bismark_methylation_extractor \
-        --gzip \
-        --bedGraph \
-        --cutoff 50 \
-        -p \
-        --parallel 4 \
-        -o $all_extracted \
-        $filter_incomplete/"$prefix"_1_bismark_bt2_pe.nonCG_filtered.bam 
-done < $data/ngs_samplelist.txt
 #Filtered
 while IFS= read -r prefix; do
     bismark_methylation_extractor \
@@ -126,5 +115,16 @@ while IFS= read -r prefix; do
         -p \
         --parallel 4 \
         -o $filtered_extracted \
+        $filter_incomplete/"$prefix"_1_bismark_bt2_pe.nonCG_filtered.bam 
+done < $data/ngs_samplelist.txt
+#Non-filtered
+while IFS= read -r prefix; do
+    bismark_methylation_extractor \
+        --gzip \
+        --bedGraph \
+        --cutoff 50 \
+        -p \
+        --parallel 4 \
+        -o $all_extracted \
         $mapped/"$prefix"_1_bismark_bt2_pe.bam
 done < $data/ngs_samplelist.txt

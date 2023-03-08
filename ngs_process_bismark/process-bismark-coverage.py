@@ -320,7 +320,7 @@ def main():
         output_primer_df(
             args.output_path,
             off_target_df,
-            'off_target',
+            'off-target',
             sample_name,
         )
 

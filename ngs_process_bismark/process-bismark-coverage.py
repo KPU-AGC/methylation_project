@@ -290,7 +290,7 @@ def main():
             output_primer_df(
                 primer_dir,
                 off_target_df,
-                'off_target',
+                'off-target',
                 sample_name,
             )
 

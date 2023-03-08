@@ -9,12 +9,14 @@ output_primer_summaries : output .csv files for each primer with summary statist
 generate_figure : generate box plot image
 
 """
-from matplotlib import pyplot
+
+#Standard libraries
 import argparse
 import pathlib
-import pandas as pd
-import numpy as np
 import csv
+#Third-party modules
+from matplotlib import pyplot
+import pandas as pd
 
 def import_seq_counts(nom_path: pathlib.Path) -> dict: 
     '''Import the total sequence counts after mapping and filtering per sample.'''
@@ -23,12 +25,12 @@ def import_seq_counts(nom_path: pathlib.Path) -> dict:
     with open(nom_path, 'r', encoding='utf-8-sig') as seq_file: 
         csv_reader = csv.reader(seq_file)
         for line in csv_reader: 
-            seq_counts[line[0]]=int(line[1].strip('\n'))
+            seq_counts[line[0]]=float(line[1].strip('\n'))
     
     return seq_counts
 
-def import_bisulfite_data(input_dir: pathlib.Path, seq_counts: dict, num_nom: int) -> dict: 
-
+def import_bisulfite_data(input_dir: pathlib.Path, seq_counts: dict, num_nom: float) -> dict: 
+    '''Import bismark sample summary data into dictionary '''
     data = dict()
     data_df = dict()
 
@@ -43,40 +45,40 @@ def import_bisulfite_data(input_dir: pathlib.Path, seq_counts: dict, num_nom: in
     ]  
 
     #Initial data import
+    #Loop through each sample
     for csv_path in input_dir.glob('*.csv'): 
-
         sample_name = csv_path.stem.split('_')[0]
-        primer_name = csv_path.stem.split('_')[-1].strip('processed_summary.csv')
         
-        #Create new list with primer name if not present
-        if primer_name not in data: 
-            data[primer_name] = []
+        with open(csv_path, 'r', newline='') as csv_file:
+            csv_reader = csv.DictReader(csv_file)
+            for row in csv_reader: 
+                primer_name = row['primer']
 
-        #Calculations
-        csv_data = pd.read_csv(csv_path)
-        mean_methylation = csv_data['methylation_percentage'].mean()
-        std_methylation = csv_data['methylation_percentage'].std()
-        mean_coverage = csv_data['coverage'].mean()
-        std_coverage = csv_data['coverage'].std()
-        if seq_counts:
-            norm_coverage = (mean_coverage/seq_counts[sample_name])*num_nom
-            norm_std_coverage = (std_coverage/seq_counts[sample_name])*num_nom
-        else: 
-            norm_coverage = mean_coverage/1
-            norm_std_coverage = std_coverage/1
+                #print(f'{sample_name} {primer_name}')
 
-        #Add data to appropriate list in dictionary (based on primer)
-        row_data = [
-            sample_name,
-            mean_methylation,
-            std_methylation,
-            mean_coverage,
-            std_coverage,
-            norm_coverage,
-            norm_std_coverage,
-        ]
+                #Create new list with primer name if not present
+                if primer_name not in data: 
+                    data[primer_name] = []
+                
+                #Calculations
+                if seq_counts:
+                    norm_coverage = (float(row['mean_coverage'])/seq_counts[sample_name])*num_nom
+                    norm_std_coverage = (float(row['std_coverage'])/seq_counts[sample_name])*num_nom
+                else: 
+                    norm_coverage = float(row['mean_coverage'])/1
+                    norm_std_coverage = float(row['std_coverage'])/1
 
-        data[primer_name].append(row_data)
+                sample_data = (
+                    sample_name,
+                    float(row['mean_methylation']),
+                    float(row['std_methylation']),
+                    float(row['mean_coverage']),
+                    float(row['std_coverage']),
+                    norm_coverage,
+                    norm_std_coverage,
+                )
+
+                data[primer_name].append(sample_data)
 
     #Conversion to DataFrames
     for primer in data: 
@@ -170,8 +172,8 @@ def parse_args():
         '--nom_count',
         dest='num_nom',
         action='store',
-        default=30000,
-        type=int,
+        default=30000.0,
+        type=float,
         help='Number of reads to normalize to. Default=30000'
     )
 

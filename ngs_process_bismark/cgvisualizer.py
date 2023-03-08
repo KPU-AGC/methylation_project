@@ -1,17 +1,44 @@
 """
+cgvisualizer.py - generate % methylation plots for each sample
 
+General workflow
+----------------
+1) Determine if coverage_file_path is a directory or path; loop through all coverage_files
+   if it is a directory
+2) Import primer data into dict
+3) Import coverage data for sample, and separate by primer set (target sites) and record
+   data + summary statistics into dictionary
+4) Create a figure for the sample where it plots: 
+    a) % methylation at each CG position
+    b) % of coverage against max coverage value at each CG position
+   Plot is generated for each target site, and combined into one figure. 
+   Target sites with no data are marked. 
+
+Functions
+---------
+import_coverage_data : from coverage file, import all of the data into a DataFrame
+import_primer_data : from primer.bed file, import all primer data into a dictionary
+get_region_data : split coverage DataFrame into list of dictionaries, where each dictionary
+                  contains methylation information about that region
+generate_figure : generate figure containing methylation plots for each target site (region)
 """
-from matplotlib import pyplot
-import numpy as np
+
+__author__ = 'Michael Ke'
+__version__ = '1.0.0'
+__comments__ = 'Should be stable.'
+
+#Standard libraries
 from statistics import mean
 import argparse
-import pandas as pd
 import csv
 import pathlib
 import re
-from collections import namedtuple
+#Third-party modules
+from matplotlib import pyplot
+import numpy as np
+import pandas as pd
 
-def import_coverage_data(path: pathlib.Path):
+def import_coverage_data(path: pathlib.Path) -> pd.DataFrame:
     '''Return pandas table with coverage file data'''
     return pd.read_table(
         path, 
@@ -26,39 +53,7 @@ def import_coverage_data(path: pathlib.Path):
         dtype={'chromosome':'str'},
         )
 
-def import_primer_data_old(path: pathlib.Path): 
-    '''Return primer data from bed file specifiying target regions'''
-    Primer = namedtuple(
-        'Primer',
-        'chromosome, start, end, primer, sequence, num_cg, cg_locations',
-        )
-    primer_data = []
-
-    with open(path, 'r', encoding='utf-8-sig') as primer_file: 
-        csv_reader = csv.reader(primer_file, delimiter='\t')
-        primer_data = []
-
-        for primer in csv_reader: 
-            num_cg = primer[4].count('CG')
-
-            cg_iter = re.finditer('CG', primer[4])
-            cg_locations = []
-            for cg in cg_iter: 
-                cg_locations.append(cg.start())
-
-            primer_data.append(Primer(
-                primer[0],
-                primer[1],
-                primer[2],
-                primer[3],
-                primer[4],
-                num_cg,
-                cg_locations
-            ))
-
-    return primer_data
-
-def import_primer_data(path: pathlib.Path): 
+def import_primer_data(path: pathlib.Path) -> dict: 
     """Return primer data from bed file specifiying target regions"""
 
     primer_data = dict()
@@ -90,7 +85,7 @@ def import_primer_data(path: pathlib.Path):
 
     return primer_data   
 
-def get_region_data(primer_data: dict, coverage_data: pd.DataFrame):
+def get_region_data(primer_data: dict, coverage_data: pd.DataFrame) -> list:
     """
     Return a list of regions and their methylation calls at each CG site
 
@@ -105,7 +100,9 @@ def get_region_data(primer_data: dict, coverage_data: pd.DataFrame):
     ------
     List of regions and their methylation calls at each CG site
     """
+
     data = []
+
     for primer in primer_data: 
         chromosome=primer_data[primer]['chromosome']
         start=primer_data[primer]['start']
@@ -162,22 +159,49 @@ def get_region_data(primer_data: dict, coverage_data: pd.DataFrame):
             print('No data')
 
         data.append(region_data)
+
     return data
 
+def generate_figure(
+        primer_data: dict, 
+        region_data: list, 
+        sample_name: str,
+        output_path: pathlib.Path,
+        show_fig_flag: bool,
+    ) -> None:
+    """
+    Generate a figure containing methylation plots for each target site. 
 
-def generate_figure(primer_data: dict, region_data: list, coverage_path: pathlib.Path):
-
+    Parameters
+    ----------
+    primer_data : dict
+        key (primer set) yields information about the primer set
+    region_data : list
+        each entry corresponds to methylation data for target site
+    sample_name : str
+        name of sample that region_data belongs to
+    output_path : pathlib.Path
+        directory to output figures (.png) to
+    show_fig_flag : bool
+        if set to True, will preview the figure
+    
+    Returns
+    -------
+    None; writes figure .png to specified directory. 
+    
+    """
     fig, axs = pyplot.subplots(7, 3, figsize=(8.5,11))
     
     region_index = 0
     #Iterate through each of the 21 plots
+    #Each plot specified as axs[i][j]
     for i in range(7): 
         for j in range(3): 
             
             primer = region_data[region_index]['primer']
-            pos_data = region_data[region_index]['positions']
+            #pos_data = region_data[region_index]['positions']
             methyl_data = region_data[region_index]['methylation']
-            cg_pos = primer_data[primer]['cg_pos']
+            #cg_pos = primer_data[primer]['cg_pos']
 
             if methyl_data: 
                 #Assign colours - mean methylation
@@ -199,7 +223,7 @@ def generate_figure(primer_data: dict, region_data: list, coverage_path: pathlib
                     range(len(methyl_data)),
                     methyl_data, 
                     width=1,
-                    align='edge',
+                    align='center',
                     color=colour,
                 )
                 axs[i][j].plot(
@@ -231,15 +255,22 @@ def generate_figure(primer_data: dict, region_data: list, coverage_path: pathlib
                 ylim=[0,100],
                 title=f'{primer}',
             )
+            axs[i][j].set_yticks(
+                (0, 50.0, 100.0),
+                labels=('0%', '50%', '100%')
+            )
             region_index = region_index + 1
+    
     pyplot.tight_layout()
-
-    sample_name = coverage_path.stem.split('_')[0]
-    output_path = coverage_path.parent.joinpath(f'{sample_name}.png')
+    fig_output_path = output_path.joinpath(f'{sample_name}.png')
     fig.subplots_adjust(top=0.94)
     fig.suptitle(sample_name)
-    fig.savefig(output_path, transparent=False, dpi=80)
-    pyplot.show()
+    #pyplot.tight_layout()
+
+    fig.savefig(fig_output_path, transparent=False, dpi=300)
+
+    if show_fig_flag:
+        pyplot.show()
 
 def parse_args(): 
     parser = argparse.ArgumentParser("Program to generate images of CG island")
@@ -256,8 +287,27 @@ def parse_args():
         action='store',
         help='Path to .csv file with primer information.',
     )
+    parser.add_argument(
+        '-o',
+        '--output',
+        dest='output_path',
+        type=pathlib.Path,
+        action='store',
+        default=None,
+        help='Directory to output results to.'
+    )
+    parser.add_argument(
+        '-v',
+        '--verbose',
+        dest='show_fig_flag',
+        action='store_true',
+        help='Show each figure as they are being generated'
+    )
 
     args = parser.parse_args()
+    
+    if not args.output_path: 
+        args.output_path = args.coverage_file_path
 
     return args
 
@@ -265,10 +315,33 @@ def main():
     args = parse_args()
 
     primer_data = import_primer_data(args.primer_file_path)
-    coverage_data = import_coverage_data(args.coverage_file_path)
 
-    region_data = get_region_data(primer_data, coverage_data)
-    generate_figure(primer_data, region_data, args.coverage_file_path)
+    if args.coverage_file_path.is_dir(): 
+        for coverage_file_path in args.coverage_file_path.glob('*.cov'): 
+            sample_name = coverage_file_path.stem.split('_')[0]
+            coverage_data = import_coverage_data(coverage_file_path)
+            region_data = get_region_data(primer_data, coverage_data)
+            generate_figure(
+                primer_data, 
+                region_data, 
+                sample_name, 
+                args.output_path,
+                args.show_fig_flag,
+            )
+    elif args.coverage_file_path.is_file(): 
+        sample_name = args.coverage_file_path.stem.split('_')[0]
+        coverage_data = import_coverage_data(args.coverage_file_path)
+        region_data = get_region_data(primer_data, coverage_data)
+        generate_figure(
+            primer_data, 
+            region_data, 
+            sample_name, 
+            args.output_path,
+            args.show_fig_flag,
+        )
+    else: 
+        print('Coverage path is neither a directory or file.')
+        exit()
 
 if __name__ == '__main__': 
     main()

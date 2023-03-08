@@ -22,6 +22,7 @@ import csv
 from collections import namedtuple
 #Third-party module
 import pandas as pd
+import numpy as np
 
 def import_primer_data(primer_path: pathlib.Path) -> list:
     '''Import primer data as a list of namedtuples'''
@@ -132,13 +133,17 @@ def process_coverage_data(primer_data: list, coverage_df: pd.DataFrame):
                 primer_df = region_df.loc[region_df['basecall']=='C']
             else: 
                 primer_df= region_df.loc[region_df['basecall']=='G']
-            
+
             #Summary statistics
             number_cg = len(primer_df)
             methylation_avg = primer_df['methylation_percentage'].mean()
             methylation_std = primer_df['methylation_percentage'].std()
+            if np.isnan(methylation_std): 
+                methylation_std = 0
             coverage_avg = primer_df['coverage'].mean()
             coverage_std = primer_df['coverage'].std()
+            if np.isnan(coverage_std):
+                coverage_std = 0
             under_coverage = sum(primer_df['coverage'] < coverage_avg)
 
             summary_data.append(
@@ -153,7 +158,7 @@ def process_coverage_data(primer_data: list, coverage_df: pd.DataFrame):
                     under_coverage
                     )
                 )
-            
+
             primer_dfs[primer.primer] = primer_df
 
             #print(primer_df)
@@ -269,7 +274,6 @@ def main():
             sample_name = coverage_path.stem.split('_')[0]
             coverage_df = import_coverage_data(coverage_path)
             summary_data, primer_dfs = process_coverage_data(primer_data, coverage_df)
-            
             off_target_df = get_off_target_df(primer_data, coverage_df)
 
             for primer in primer_dfs: 

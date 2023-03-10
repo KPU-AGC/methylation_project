@@ -61,13 +61,13 @@ Due to the unique characteristics of bisulfite-converted DNA, PCRs on bisulfite-
     * Vortexing briefly seems to produce more consistent results than flicking and inverting the tubes. 
 5. Load the tubes into a thermocycler, and use the following program: 
     #### Table 3: Thermocycling protocol for Phusion U 
-    | Temperature | Duration  |
-    | ----------- | --------- |
-    | 98°C        | 30s       |
-    | 98°C        | 10s (x40) |
-    | X°C         | 30s (x40) |
-    | 72°C        | 30s (x40) |
-    | 72°C        | 10 min    |
+    | Stage   | Temperature | Duration |
+    | ------- | ----------- | -------- |
+    | 1       | 98°C        | 30s      |
+    | 2 (x45) | 98°C        | 10s      |
+    |         | X°C         | 30s      |
+    |         | 72°C        | 30s      |
+    | 3       | 72°C        | 10 min   |
 6. To confirm the success of the PCR, perform agarose gel electrophoresis. Prepare a 2% gel. Load 3 uL of PCR product mixed with 3 uL of loading dye into each well. Load 1 uL of ladder mixed with 3 uL of loading dye and 3 uL of water. Run the gel at 120 V for 40 minutes. 
 7. For PCR optimization, prepare 6-9 replicates of each PCR and test them in 1 C increments in the Quantstudio 5. These PCR sets are extremely sensitivie to the annealing temperature. 
 

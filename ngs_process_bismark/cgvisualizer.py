@@ -190,13 +190,44 @@ def generate_figure(
     None; writes figure .png to specified directory. 
     
     """
-    fig, axs = pyplot.subplots(7, 3, figsize=(8.5,11))
+    #Calculate the number of subplots that should exist
+    #Currently, our primer sets look like this: 
+    #BS-Run-1 : 30 sets
+    #BS-Run-2 : 20 sets
+    #BSX-Run-2: 16 sets
+    #BSX-Run-3: 21 sets
+
+    #TODO: do not hardcode these plots
+    #Current implementation - based on the number of primers, generate 
+    # the appropriate width and height params to fit all samples
+    num_primers = len(primer_data)
+    print(num_primers)
+    if num_primers == 30: 
+        height = 10
+        width = 3
+    elif num_primers == 21:
+        height = 7
+        width = 3
+    elif num_primers == 20: 
+        height = 10
+        width = 2
+    elif num_primers == 16: 
+        height = 8
+        width = 2
+    else: 
+        print('NUMBER OF PRIMERS NOT USED IN BOVITEQ PROJECT.')
+        print('PROGRAM CANNOT CONTINUE. FUTURE IMPLEMENTATION WILL FIX THIS ISSUE')
+        exit() 
+
+
+
+    fig, axs = pyplot.subplots(height, width, figsize=(8.5,11))
     
     region_index = 0
     #Iterate through each of the 21 plots
     #Each plot specified as axs[i][j]
-    for i in range(7): 
-        for j in range(3): 
+    for i in range(height): 
+        for j in range(width): 
             
             primer = region_data[region_index]['primer']
             #pos_data = region_data[region_index]['positions']
@@ -257,7 +288,9 @@ def generate_figure(
             )
             axs[i][j].set_yticks(
                 (0, 50.0, 100.0),
-                labels=('0%', '50%', '100%')
+            )
+            axs[i][j].set_yticklabels(
+                ('0%', '50%', '100%')
             )
             region_index = region_index + 1
     

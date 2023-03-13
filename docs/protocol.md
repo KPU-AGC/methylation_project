@@ -174,7 +174,7 @@ results/
 ### Generating QC results for the entire run
 #### Review the `fastqc` and `multiqc` results
 This protocol will not go over how to interpret `fastqc` results. A basic tutorial can be found [here](https://rtsf.natsci.msu.edu/genomics/tech-notes/fastqc-tutorial-and-faq/). `multiqc` is a useful tool for summarizing all of the fastqc results from a single run. The results (`.html` files) for both tools can be viewed in a web browser. 
-#### `process-bismark-reports.py` and `process-bismark-incomplete-reports.py`
+#### process-bismark-reports.py and process-bismark-incomplete-reports.py
 `process-bismark-reports.py` generates a .csv file containing summary statistics of the read mapping for each sample. It crawls through the `report.txt` files and extracts the relevant information. To use this script, run the following command: 
 ```
 python ./process-bismark-reports.py <bismark/mapped_bam> -o </path/to/results/directory>
@@ -185,7 +185,7 @@ python ./process-bismark-incomplete-reports.py <bismark/incomplete_conv_bam> -o 
 ```
 In a future revision of this pipeline, both scripts will be combined. For now, the data from both .csv files has to be manually combined to yield the final run results .csv file. The percentage of usable reads can now be determined. 
 
-### `process-bismark-coverage.py`
+### process-bismark-coverage.py
 The purpose of the script is to generate sample summary files and human-readable .csv files of the methylation call data. The outputs of this script are used in downstream analysis scripts. To run the script, run the following command: 
 
 ```
@@ -219,14 +219,14 @@ A `sample-name_summary.csv` file is generated for each sample, and summarizes th
 
 Each row corresponds to a target site that there is data for. `#CG_total` refers to the total number of `CG` sites in the target region. `#CG_covered` refers to the number of `CG` sites in the region that have data for. `mean_methylation` and `std_methylation` are the summary statistics for the methylation status of the entire target site. `mean_coverage` and `std_coverage` are summary statistics for the number of reads that contribute to the calls of the region. 
 
-### `cgvisualizer.py`
+### cgvisualizer.py
 This script plots the methylation calls for each target site for each sample. The input files for this script are the coverage files and the primer.bed file. To run the script, run the following command: 
 ```
 python ./cgvisualizer.py </path/to/coverage-files> </path/to/primer.bed> -o <results/>
 ```
 Each sample gets its own `.png` file containing the methylation plots for all 21 target sites. Target sites that do not have data are labeled as 'no data'. There is also a line plot that corresponds to the coverage at each `CG` position overlayed on top of the methylation plot. 
 
-### `assess-by-primer.py`
+### assess-by-primer.py
 This script generates box plots of the site coverage for each primer set. The input files are the `sample-name_summary.csv` files from `process-bismark-coverage.py` for the group of samples that you want to analyze together, as well as a `sample-sequences.csv` file containing two columns: the sample names, and the final number of usable reads (refer to QC steps to get this value). To run the script, run the following command: 
 ```
 python ./assess-by-primer.py </path/to/sample-name_summary.csv> -n </path/to/sample-sequences.csv> -t <tag> -o <results/>

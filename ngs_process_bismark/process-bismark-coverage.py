@@ -146,20 +146,23 @@ def process_coverage_data(primer_data: list, coverage_df: pd.DataFrame):
                 coverage_std = 0
             under_coverage = sum(primer_df['coverage'] < coverage_avg)
 
-            summary_data.append(
-                (
-                    primer.primer,
-                    primer.num_cg,
-                    number_cg,
-                    methylation_avg, 
-                    methylation_std, 
-                    coverage_avg, 
-                    coverage_std,
-                    under_coverage
+            if primer_df.empty: 
+                pass
+            else: 
+                summary_data.append(
+                    (
+                        primer.primer,
+                        primer.num_cg,
+                        number_cg,
+                        methylation_avg, 
+                        methylation_std, 
+                        coverage_avg, 
+                        coverage_std,
+                        under_coverage
+                        )
                     )
-                )
 
-            primer_dfs[primer.primer] = primer_df
+                primer_dfs[primer.primer] = primer_df
 
             #print(primer_df)
             #print(f'{primer.primer} mean methylation: {methylation_avg}')

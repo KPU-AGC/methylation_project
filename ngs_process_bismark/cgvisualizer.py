@@ -226,7 +226,7 @@ def generate_figure(
     #Each plot specified as axs[i][j]
     for i in range(height): 
         for j in range(width): 
-            if region_index < len(num_primers):
+            if region_index < num_primers:
                 primer = region_data[region_index]['primer']
                 #pos_data = region_data[region_index]['positions']
                 methyl_data = region_data[region_index]['methylation']

@@ -211,15 +211,13 @@ def generate_figure(
     elif num_primers == 20: 
         height = 10
         width = 2
-    elif num_primers == 16: 
-        height = 8
-        width = 2
+    elif num_primers == 17: 
+        height = 6
+        width = 3
     else: 
         print('NUMBER OF PRIMERS NOT USED IN BOVITEQ PROJECT.')
         print('PROGRAM CANNOT CONTINUE. FUTURE IMPLEMENTATION WILL FIX THIS ISSUE')
         exit() 
-
-
 
     fig, axs = pyplot.subplots(height, width, figsize=(8.5,11))
     
@@ -228,70 +226,72 @@ def generate_figure(
     #Each plot specified as axs[i][j]
     for i in range(height): 
         for j in range(width): 
-            
-            primer = region_data[region_index]['primer']
-            #pos_data = region_data[region_index]['positions']
-            methyl_data = region_data[region_index]['methylation']
-            #cg_pos = primer_data[primer]['cg_pos']
+            if region_index < num_primers:
+                primer = region_data[region_index]['primer']
+                #pos_data = region_data[region_index]['positions']
+                methyl_data = region_data[region_index]['methylation']
+                #cg_pos = primer_data[primer]['cg_pos']
 
-            if methyl_data: 
-                #Assign colours - mean methylation
-                #Green = Methylated, >70%
-                #Yellow = 30-70%
-                #Blue = Unmethylated, <30%
-                
-                max_coverage = max(region_data[region_index]['coverage'])
+                if methyl_data: 
+                    #Assign colours - mean methylation
+                    #Green = Methylated, >70%
+                    #Yellow = 30-70%
+                    #Blue = Unmethylated, <30%
+                    
+                    max_coverage = max(region_data[region_index]['coverage'])
 
-                mean_methylation = mean(methyl_data)
-                if mean_methylation >= 70.0: 
-                    colour = 'forestgreen'
-                elif  30 < mean_methylation < 70.0: 
-                    colour = 'wheat'
-                else: 
-                    colour = 'lightskyblue'
+                    mean_methylation = mean(methyl_data)
+                    if mean_methylation >= 70.0: 
+                        colour = 'forestgreen'
+                    elif  30 < mean_methylation < 70.0: 
+                        colour = 'wheat'
+                    else: 
+                        colour = 'lightskyblue'
 
-                axs[i][j].bar(
-                    range(len(methyl_data)),
-                    methyl_data, 
-                    width=1,
-                    align='center',
-                    color=colour,
-                )
-                axs[i][j].plot(
-                    region_data[region_index]['relative_coverage'],
-                    'red'
+                    axs[i][j].bar(
+                        range(len(methyl_data)),
+                        methyl_data, 
+                        width=1,
+                        align='center',
+                        color=colour,
                     )
-                axs[i][j].text(
-                    0,
-                    3,
-                    f'max(coverage)={str(max_coverage)}',
-                    fontsize='x-small',
+                    axs[i][j].plot(
+                        region_data[region_index]['relative_coverage'],
+                        'red'
+                        )
+                    axs[i][j].text(
+                        0,
+                        3,
+                        f'max(coverage)={str(max_coverage)}',
+                        fontsize='x-small',
+                    )
+                
+                else: 
+                    axs[i][j].bar(
+                        0,
+                        0,
+                        width=1,
+                        align='edge',
+                    )
+                    axs[i][j].text(
+                        0.5,
+                        50,
+                        'No data',
+                        horizontalalignment='center',
+                        verticalalignment='center',  
+                    )
+                axs[i][j].set(
+                    ylim=[0,100],
+                    title=f'{primer}',
                 )
-            
+                axs[i][j].set_yticks(
+                    (0, 50.0, 100.0),
+                )
+                axs[i][j].set_yticklabels(
+                    ('0%', '50%', '100%')
+                )
             else: 
-                axs[i][j].bar(
-                    0,
-                    0,
-                    width=1,
-                    align='edge',
-                )
-                axs[i][j].text(
-                    0.5,
-                    50,
-                    'No data',
-                    horizontalalignment='center',
-                    verticalalignment='center',  
-                )
-            axs[i][j].set(
-                ylim=[0,100],
-                title=f'{primer}',
-            )
-            axs[i][j].set_yticks(
-                (0, 50.0, 100.0),
-            )
-            axs[i][j].set_yticklabels(
-                ('0%', '50%', '100%')
-            )
+                pass
             region_index = region_index + 1
     
     pyplot.tight_layout()

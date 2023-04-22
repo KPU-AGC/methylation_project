@@ -50,11 +50,30 @@ The reference genomes for your organism can be downloaded from NCBI. There are s
 Detailed instructions on using either of those resources can be found [here](link).
 
 #### Generating variant call file for genome masking
-TBD - unnecessary atm
+VCF files, GFF files, and BED files are acceptable forms of inputs for the `bedtools` `maskfasta` tool.  
+
+The SNP file is not in a strict VCF format. At minimum, the SNP file should be a tab-delimited file containing the following information (VCF): 
+
+| ID | chr | position | snp value | ref/SNP |
+| -- | --- | -------- | --------- | ------- |
+| 12 | 5 | 48794752 | 1 | C/T |
+
+BED (0-based coordinates): 
+
+| chr | start | end | name |
+| --- | -------- | --------- | ------- |
+| 5 | 48794752 | 48794753 | C>G |
+
 #### Generating a masked genome using bedtools maskfasta
-TBD - unnecesssary atm
+To generate a masked genome, use the following command: 
+
+```
+bedtools maskfasta -fi </path/to/genome/folder> -bed </path/to/bed> -fo </path/to/output/folder>
+```
+
+
 #### Generating a bisulfite-converted reference genome
-The method for generating a bisulfite-converted reference genome is the same for the masked and umasked genomes. Ensure that you're using the appropriate genome, and that the compressed (`gzip`) genome FASTA file is in a correctly labeled folder (e.g. arsucd1.2 for the ARS-UCD1.2 Bovine genome). `Bismark` has a tool called `bismark_genome_preparation` that will do an in-silico bisulfite conversion of the supplied reference genome, allowing for mapping to all four of the resulting converted sequences. The instructions for preparing the genome are adapted from [here](https://rawgit.com/FelixKrueger/Bismark/master/Docs/Bismark_User_Guide.html#i-running-bismark-genome-preparation).
+The method for generating a bisulfite-converted reference genome is the same for the masked and umasked genomes. Ensure that you're using the appropriate genome, and that the genome FASTA file is in a correctly labeled folder (e.g. arsucd1.2 for the ARS-UCD1.2 Bovine genome). The genome does not need to be compressed. `Bismark` has a tool called `bismark_genome_preparation` that will do an in-silico bisulfite conversion of the supplied reference genome, allowing for mapping to all four of the resulting converted sequences. The instructions for preparing the genome are adapted from [here](https://rawgit.com/FelixKrueger/Bismark/master/Docs/Bismark_User_Guide.html#i-running-bismark-genome-preparation).
 
 To prepare the genome, run the following command: 
 
@@ -67,7 +86,7 @@ A folder in the same directory as the genome FASTA file named `Bisulfite_Genome`
 ```
 genome_name/
 ├─ Bisulfite_Genome/
-├─ genome.fna.gz
+├─ genome.fa.gz
 ```
 When using Bismark, pass `genome_name/` as the argument for the genome path. 
 
@@ -79,7 +98,7 @@ The BSPCR-short.bed file used for input into the assess-by-primer.py is slightly
 | chrom | start coordinate | end coordinate | primer ID | sequence |
 | ----- | ---------------- | -------------- | --------- | -------- |
 | 3	| 101832510	| 101832748	| DMAP-BP1X	| TTCTTCA....TTCACCTA |
-
+ 
 Normally, the fifth field of the BED file is a track score. However, bedtools getfasta can output a sequence to the fifth field, which we need for later analysis scripts.
 
 #### Protocol

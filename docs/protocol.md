@@ -71,7 +71,6 @@ To generate a masked genome, use the following command:
 bedtools maskfasta -fi </path/to/genome/folder> -bed </path/to/bed> -fo </path/to/output/folder>
 ```
 
-
 #### Generating a bisulfite-converted reference genome
 The method for generating a bisulfite-converted reference genome is the same for the masked and umasked genomes. Ensure that you're using the appropriate genome, and that the genome FASTA file is in a correctly labeled folder (e.g. arsucd1.2 for the ARS-UCD1.2 Bovine genome). The genome does not need to be compressed. `Bismark` has a tool called `bismark_genome_preparation` that will do an in-silico bisulfite conversion of the supplied reference genome, allowing for mapping to all four of the resulting converted sequences. The instructions for preparing the genome are adapted from [here](https://rawgit.com/FelixKrueger/Bismark/master/Docs/Bismark_User_Guide.html#i-running-bismark-genome-preparation).
 

@@ -142,10 +142,12 @@ def generate_snpsplit_file(data: list, name: str, output_path: pathlib.Path) -> 
     variant_set = set()
     
     #The variants are arbitrarily indexed. They just need an ID name.
-    for index, variant in enumerate(data):
+    for variant in data:
         variant_set.add(
             (
-                index, 
+                variant[2].split('_')[1].split('-')[0],
+                #Troubleshooting - show the exact primer set used
+                #variant[2].split('_')[1],
                 variant[0], 
                 variant[1], 
                 1, 

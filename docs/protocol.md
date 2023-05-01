@@ -41,13 +41,10 @@ conda env create --file <methylation_project.yml>
 To activate the the environment, use `conda activate methylation_project`. Whenever a shell script or Python script is run, this environment must be active.  
 
 ### Downloading and generating the reference genome files for Bismark mapper
-#### Downloading a reference genome from NCBI
-The reference genomes for your organism can be downloaded from NCBI. There are several methods of downloading the genomes, but the most important thing is that the genomes are in the `multi-FASTA` file format. Methods available are: 
+#### Downloading a reference genome from Ensembl
+The reference genomes used for this analysis should be retrieved from Ensembl. This is because the Ensembl genomes use chromosome numbers to label each FASTA entry, whereas the NCBI genomes use the accession ID. If you choose to use NCBI genomes, you will have to replace any chromosome number call with the appropriate acecssion ID. 
 
-1. Using [NCBI Datasets](https://www.ncbi.nlm.nih.gov/datasets/)
-2. Accessing the NCBI [FTP](https://ftp.ncbi.nlm.nih.gov/) site
-
-Detailed instructions on using either of those resources can be found [here](link).
+To retrieve the ARS-UCD1.2 genome, use the Ensembl [FTP](https://useast.ensembl.org/info/data/ftp/index.html) site. Download the toplevel genome. 
 
 #### Generating variant call file for genome masking
 VCF files, GFF files, and BED files are acceptable forms of inputs for the `bedtools` `maskfasta` tool.  
@@ -65,6 +62,8 @@ BED (0-based coordinates):
 | 5 | 48794752 | 48794753 | C>G |
 
 #### Generating a masked genome using bedtools maskfasta
+To use the SNPsplit pipeline, the genome must be masked at the SNP positions used to separate the reads by genotype calls. 
+
 To generate a masked genome, use the following command: 
 
 ```

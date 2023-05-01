@@ -33,6 +33,7 @@ import argparse
 import csv
 import pathlib
 import re
+from math import ceil
 #Third-party modules
 from matplotlib import pyplot
 import numpy as np
@@ -190,6 +191,10 @@ def generate_figure(
     None; writes figure .png to specified directory. 
     
     """
+    def _get_fig_size(num_primers: int) -> int: 
+        fig_height = ceil(num_primers/3)
+        return fig_height, 3
+    
     #Calculate the number of subplots that should exist
     #Currently, our primer sets look like this: 
     #BS-Run-1 : 30 sets
@@ -201,23 +206,25 @@ def generate_figure(
     #Current implementation - based on the number of primers, generate 
     # the appropriate width and height params to fit all samples
     num_primers = len(primer_data)
-    print(num_primers)
-    if num_primers == 30: 
-        height = 10
-        width = 3
-    elif num_primers == 21:
-        height = 7
-        width = 3
-    elif num_primers == 20: 
-        height = 10
-        width = 2
-    elif num_primers == 17: 
-        height = 6
-        width = 3
-    else: 
-        print('NUMBER OF PRIMERS NOT USED IN BOVITEQ PROJECT.')
-        print('PROGRAM CANNOT CONTINUE. FUTURE IMPLEMENTATION WILL FIX THIS ISSUE')
-        exit() 
+    #print(num_primers)
+    #if num_primers == 30: 
+    #    height = 10
+    #    width = 3
+    #elif num_primers == 21:
+    #    height = 7
+    #    width = 3
+    #elif num_primers == 20: 
+    #    height = 10
+    #    width = 2
+    #elif num_primers == 17: 
+    #    height = 6
+    #    width = 3
+    #else: 
+    #    print('NUMBER OF PRIMERS NOT USED IN BOVITEQ PROJECT.')
+    #    print('PROGRAM CANNOT CONTINUE. FUTURE IMPLEMENTATION WILL FIX THIS ISSUE')
+    #    exit() 
+
+    height, width = _get_fig_size(num_primers)
 
     fig, axs = pyplot.subplots(height, width, figsize=(8.5,11))
     
@@ -336,6 +343,13 @@ def parse_args():
         action='store_true',
         help='Show each figure as they are being generated'
     )
+    parser.add_argument(
+        '-s',
+        '--snpsplit',
+        dest='snp_flag',
+        action='store_true',
+        help='Set if you are processing SNPsplit BAMs.',
+    )
 
     args = parser.parse_args()
     
@@ -351,13 +365,20 @@ def main():
 
     if args.coverage_file_path.is_dir(): 
         for coverage_file_path in args.coverage_file_path.glob('*.cov'): 
-            sample_name = coverage_file_path.stem.split('_')[0]
+            #Define correct sample ID name
+            if args.snp_flag: 
+                sample_name = coverage_file_path.stem.split('_')[0]
+                pool_name = coverage_file_path.stem.split('.')[-2]
+                sample_id = f'{sample_name}_{pool_name}'
+            else: 
+                sample_id = coverage_file_path.stem.split('_')[0]
+
             coverage_data = import_coverage_data(coverage_file_path)
             region_data = get_region_data(primer_data, coverage_data)
             generate_figure(
                 primer_data, 
                 region_data, 
-                sample_name, 
+                sample_id, 
                 args.output_path,
                 args.show_fig_flag,
             )

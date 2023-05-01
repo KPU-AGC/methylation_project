@@ -99,6 +99,8 @@ def process_coverage_data(primer_data: list, coverage_df: pd.DataFrame):
             & (coverage_df.end < int(primer.end))
         ]
 
+        #print(region_df)
+
         if region_df.empty:
             #print(f'No data for {primer.primer}')
             pass
@@ -134,6 +136,8 @@ def process_coverage_data(primer_data: list, coverage_df: pd.DataFrame):
             else: 
                 primer_df= region_df.loc[region_df['basecall']=='G']
 
+            #print(primer_df)
+
             #Summary statistics
             number_cg = len(primer_df)
             methylation_avg = primer_df['methylation_percentage'].mean()
@@ -147,6 +151,7 @@ def process_coverage_data(primer_data: list, coverage_df: pd.DataFrame):
             under_coverage = sum(primer_df['coverage'] < coverage_avg)
 
             if primer_df.empty: 
+                #print(f'{primer.primer} empty')
                 pass
             else: 
                 summary_data.append(
@@ -245,6 +250,13 @@ def parse_args():
         type=pathlib.Path,
         help='Directory to output to.'
     )
+    parser.add_argument(
+        '-s', 
+        '--snpsplit',
+        dest='snp_flag',
+        action='store_true',
+        help='Set this parameter if you are processing several bams per file (SNPsplit)',
+    )
     args = parser.parse_args()
     if args.output_path is None: 
         args.output_path = args.coverage_path.parent
@@ -274,9 +286,17 @@ def main():
         print(primer_dir)
 
         for coverage_path in coverage_paths: 
-            sample_name = coverage_path.stem.split('_')[0]
+            if args.snp_flag: 
+                sample_name = coverage_path.stem.split('_')[0]
+                pool_name = coverage_path.stem.split('.')[-2]
+                sample_id = f'{sample_name}_{pool_name}'
+            else: 
+                sample_id = coverage_path.stem.split('_')[0]
+
             coverage_df = import_coverage_data(coverage_path)
+            #print(f'Sample id: {sample_id}')
             summary_data, primer_dfs = process_coverage_data(primer_data, coverage_df)
+            #print(f'Summary data list: {summary_data}')
             off_target_df = get_off_target_df(primer_data, coverage_df)
 
             for primer in primer_dfs: 
@@ -284,13 +304,13 @@ def main():
                     primer_dir, 
                     primer_dfs[primer], 
                     primer,
-                    sample_name,
+                    sample_id,
                 )
 
             output_summary_data(
                 summary_dir,
                 summary_data,
-                sample_name
+                sample_id
             )
 
             #Output remainder mapped
@@ -298,7 +318,7 @@ def main():
                 primer_dir,
                 off_target_df,
                 'off-target',
-                sample_name,
+                sample_id,
             )
 
     elif args.coverage_path.is_file(): 

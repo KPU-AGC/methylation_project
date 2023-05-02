@@ -89,7 +89,7 @@ genome_name/
 When using Bismark, pass `genome_name/` as the argument for the genome path. 
 
 ### Generating a primer.bed file for analysis scripts
-This file is generated using [`bedtools getfasta`](blah). Refer to the [UCSC page](https://genome.ucsc.edu/FAQ/FAQformat.html#format1) for information about the BED file format. 
+This file is generated using [`bedtools getfasta`](https://bedtools.readthedocs.io/en/latest/content/tools/getfasta.html). Refer to the [UCSC page](https://genome.ucsc.edu/FAQ/FAQformat.html#format1) for information about the BED file format. Note that BED files use a 0-based coordinate system, and thus 0-based coordinates must be passed to the program.
 
 The BSPCR-short.bed file used for input into the assess-by-primer.py is slightly modified: 
 
@@ -98,6 +98,7 @@ The BSPCR-short.bed file used for input into the assess-by-primer.py is slightly
 | 3	| 101832510	| 101832748	| DMAP-BP1X	| TTCTTCA....TTCACCTA |
  
 Normally, the fifth field of the BED file is a track score. However, bedtools getfasta can output a sequence to the fifth field, which we need for later analysis scripts.
+
 
 #### Protocol
 

@@ -1,6 +1,9 @@
 """
 cgvisualizer.py - generate % methylation plots for each sample
 
+Ensure that the coverage files being provided to this script use 0-based coordinates. 
+All calculations performed use 0-based coordinates.
+
 General workflow
 ----------------
 1) Determine if coverage_file_path is a directory or path; loop through all coverage_files
@@ -105,6 +108,7 @@ def get_region_data(primer_data: dict, coverage_data: pd.DataFrame) -> list:
     data = []
 
     for primer in primer_data: 
+        #NOTE: primer coordinates are 0-based. 
         chromosome=primer_data[primer]['chromosome']
         start=primer_data[primer]['start']
         end=primer_data[primer]['end']        
@@ -113,13 +117,15 @@ def get_region_data(primer_data: dict, coverage_data: pd.DataFrame) -> list:
         #Get Dataframe of CG positions within primer region 
         region_df = coverage_data[
             (coverage_data.chromosome == chromosome) 
-            & (coverage_data.start > int(start)) 
-            & (coverage_data.end < int(end))
-            ]
+            & (coverage_data.start >= int(start)) 
+            & (coverage_data.end <= int(end))
+        ]
         
-        #For each CG position, get the position relative to the sequence file 
-        # in 0-based coordinate, then store in dataframe
-        region_df.loc[:,'seq_pos'] = region_df.loc[:,'start'] - 1 - int(start)
+        #For each CG position, get the position relative to the sequence file then store in dataframe
+        #1-based input
+        #region_df.loc[:,'seq_pos'] = region_df.loc[:,'start'] - 1 - int(start)
+        #0-based input
+        region_df.loc[:,'seq_pos'] = region_df.loc[:,'start'] - int(start)
 
         #Determine basecall for each CG position (is it C or G)
         basecalls = []
@@ -153,6 +159,7 @@ def get_region_data(primer_data: dict, coverage_data: pd.DataFrame) -> list:
             'coverage':primer_df.loc[:,'coverage'].to_list(),
         }
         try: 
+            #Calculating relative coverage
             max_cov = max(region_data['coverage'])
             region_data['relative_coverage'] = [(cov/max_cov)*100 for cov in region_data['coverage']]
             print(region_data['relative_coverage'])
@@ -316,7 +323,7 @@ def parse_args():
     parser = argparse.ArgumentParser("Program to generate images of CG island")
 
     parser.add_argument(
-        'coverage_file_path',
+        'coverage_path',
         type=pathlib.Path,
         action='store',
         help='Path to coverage file(s)'
@@ -363,17 +370,27 @@ def main():
 
     primer_data = import_primer_data(args.primer_file_path)
 
-    if args.coverage_file_path.is_dir(): 
-        for coverage_file_path in args.coverage_file_path.glob('*.cov'): 
+    #Directory
+    if args.coverage_path.is_dir(): 
+        for coverage_path in args.coverage_path.glob('*.cov'): 
             #Define correct sample ID name
             if args.snp_flag: 
-                sample_name = coverage_file_path.stem.split('_')[0]
-                pool_name = coverage_file_path.stem.split('.')[-2]
+                sample_name = coverage_path.stem.split('_')[0]
+                #Check for genome assignment
+                if 'genome1' in coverage_path.stem: 
+                    pool_name = 'genome1'
+                elif 'genome2' in coverage_path.stem: 
+                    pool_name = 'genome2'
+                elif 'unassigned' in coverage_path.stem:
+                    pool_name = 'unassigned'
+                else: 
+                    pool_name ='cursed'
                 sample_id = f'{sample_name}_{pool_name}'
             else: 
-                sample_id = coverage_file_path.stem.split('_')[0]
+                sample_id = coverage_path.stem.split('_')[0]
 
-            coverage_data = import_coverage_data(coverage_file_path)
+            #Generating figures for each file
+            coverage_data = import_coverage_data(coverage_path)
             region_data = get_region_data(primer_data, coverage_data)
             generate_figure(
                 primer_data, 
@@ -382,9 +399,11 @@ def main():
                 args.output_path,
                 args.show_fig_flag,
             )
+
+    #File
     elif args.coverage_file_path.is_file(): 
         sample_name = args.coverage_file_path.stem.split('_')[0]
-        coverage_data = import_coverage_data(args.coverage_file_path)
+        coverage_data = import_coverage_data(args.coverage_path)
         region_data = get_region_data(primer_data, coverage_data)
         generate_figure(
             primer_data, 

@@ -63,6 +63,10 @@ while IFS= read -r prefix; do
 done < $data/ngs_samplelist.txt
 fastqc -t 16 -outdir $post_trim_fastqc $trimmed/*.fastq
 
+#Running multiqc
+multiqc $pre_trim_fastqc --outdir $pre_trim_fastqc
+multiqc $post_trim_fastqc --outdir $post_trim_fastqc
+
 #STEP 2: MAPPING
 #---------------
 #Assumes that the bowtie2 mapper is used
@@ -146,7 +150,7 @@ while IFS= read -r prefix; do
     bismark_methylation_extractor \
         --gzip \
         --bedGraph \
-        --cutoff 50 \
+        --zero_based \
         -p \
         --parallel 4 \
         -o $filtered_extracted \
@@ -157,7 +161,7 @@ while IFS= read -r prefix; do
     bismark_methylation_extractor \
         --gzip \
         --bedGraph \
-        --cutoff 50 \
+        --zero_based \
         -p \
         --parallel 4 \
         -o $all_extracted \
@@ -178,7 +182,7 @@ while IFS= read -r prefix; do
     bismark_methylation_extractor \
         --gzip \
         --bedGraph \
-        --cutoff 50 \
+        --zero_based \
         -p \
         --parallel 4 \
         -o $filtered_snpsplit_extract \
@@ -187,7 +191,7 @@ while IFS= read -r prefix; do
     bismark_methylation_extractor \
         --gzip \
         --bedGraph \
-        --cutoff 50 \
+        --zero_based \
         -p \
         --parallel 4 \
         -o $filtered_snpsplit_extract \
@@ -196,7 +200,7 @@ while IFS= read -r prefix; do
     bismark_methylation_extractor \
         --gzip \
         --bedGraph \
-        --cutoff 50 \
+        --zero_based \
         -p \
         --parallel 4 \
         -o $filtered_snpsplit_extract \
@@ -209,7 +213,7 @@ while IFS= read -r prefix; do
     bismark_methylation_extractor \
         --gzip \
         --bedGraph \
-        --cutoff 50 \
+        --zero_based \
         -p \
         --parallel 4 \
         -o $all_snpsplit_extract \
@@ -218,7 +222,7 @@ while IFS= read -r prefix; do
     bismark_methylation_extractor \
         --gzip \
         --bedGraph \
-        --cutoff 50 \
+        --zero_based \
         -p \
         --parallel 4 \
         -o $all_snpsplit_extract \
@@ -227,7 +231,7 @@ while IFS= read -r prefix; do
     bismark_methylation_extractor \
         --gzip \
         --bedGraph \
-        --cutoff 50 \
+        --zero_based \
         -p \
         --parallel 4 \
         -o $all_snpsplit_extract \

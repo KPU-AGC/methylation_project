@@ -66,14 +66,16 @@ def get_region_data(primer_data: dict, depth_data: pd.DataFrame) -> list:
     data = []
 
     for primer in primer_data: 
+        #NOTE: primer coordinates are 0-based.
         chromosome=primer_data[primer]['chromosome']
         start=primer_data[primer]['start']
         end=primer_data[primer]['end']     
-    
+
+        #Get Dataframe of CG positions within primer region 
         region_df = depth_data[
             (depth_data.chromosome == chromosome) 
-            & (depth_data.position > int(start)) 
-            & (depth_data.position < int(end))
+            & (depth_data.position >= int(start)) 
+            & (depth_data.position <= int(end))
         ]
 
         region_data ={
@@ -103,6 +105,10 @@ def generate_figure(region_data: dict, sample_name: str, output_path: pathlib.Pa
     """
 
     def _get_fig_size(num_primers: int) -> int: 
+        """
+        Calculate the number of panels for the figure. 
+        There will always be three columns of plots. 
+        """
         fig_height = ceil(num_primers/3)
         return fig_height, 3
 
@@ -119,7 +125,7 @@ def generate_figure(region_data: dict, sample_name: str, output_path: pathlib.Pa
         for j in range(width): 
             #Only try to generate plots when there's still data
             if region_index < num_primers: 
-                
+                #Output for regions with 0 data.
                 if region_data[region_index]['depth_df'].empty:
                     axs[i][j].bar(
                         0,
@@ -135,22 +141,20 @@ def generate_figure(region_data: dict, sample_name: str, output_path: pathlib.Pa
                         verticalalignment='center',  
                     )
                 else:
-        
+                    #Get the depth 
                     depth_df = region_data[region_index]['depth_df']
-                    
                     print(depth_df.columns)
-
                     print(depth_df)
-                    data = depth_df.loc[:,'count']
+                    count_data = depth_df.loc[:,'count']
 
                     #Generate bar graph
                     axs[i][j].bar(
                         range(len(depth_df.index)),
-                        data,
+                        count_data,
                         width=1,
                         align='edge',
                     )
-
+                #General plot formatting
                 primer = region_data[region_index]['primer']
                 axs[i][j].set(
                     title=f'{primer}'
@@ -159,6 +163,7 @@ def generate_figure(region_data: dict, sample_name: str, output_path: pathlib.Pa
                 print('NO DATA')
             region_index = region_index + 1
     
+    #Output parameters
     fig_output_path = output_path.joinpath(f'{sample_name}.png')
     fig.subplots_adjust(top=0.94)
     fig.suptitle(sample_name)

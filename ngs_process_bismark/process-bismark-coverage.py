@@ -15,8 +15,8 @@ output_summary_data : output summary .csv files
 output_primer_df : output individual primer .csv files
 '''
 __author__ = 'Michael Ke'
-__version__ = '1.0.0'
-__comments__ = 'Stable.'
+__version__ = '2.0.0'
+__comments__ = 'Working.'
 
 #Standard libraries
 import argparse
@@ -143,7 +143,7 @@ class MethylCallData():
                 (methylation_df.chromosome == primer.chromosome) 
                 & (methylation_df.start >= int(primer.start)) 
                 & (methylation_df.end <= int(primer.end))
-            ]
+            ].copy(deep=True)
 
             if region_df.empty:
                 print(f'No data for {primer.primer}')
@@ -151,7 +151,7 @@ class MethylCallData():
                 #For each CG position, get the position relative to the sequence file 
                 # in 0-based coordinate, then store in dataframe.
                 #Assumes input coverage file was 0-based.
-                region_df['seq_pos'] = region_df['start'] - int(primer.start)
+                region_df['seq_pos'] = region_df.loc[:, 'start'] - int(primer.start)
 
                 #Sum unmethylated and methylated read calls to get total coverage
                 region_df['depth'] = (
@@ -237,34 +237,58 @@ class MethylCallData():
 
             target_sites = []
             for key in region_data: 
-                target_data = {
+                if cg_flag: 
+                    cg_pos = primer_data[key].cg_pos
+
+                    #Check for orientation. 
+                    primer_suffix = key.split('-')[1]
+                    if 'BN' in primer_suffix: 
+                        cg_pos = [pos + 1 for pos in cg_pos]
+                    
+                    #Slice out only rows that are CG positions
+                    cg_only_df = region_data[key][region_data[key]['start'].isin(cg_pos)]
+
+                    #Re-insert missing CGs with 0'd data
+                    missing_data = []
+                    cg_list = cg_only_df.loc[:, 'start'].tolist()
+                    for cg in cg_pos:
+                        if not(cg in cg_list):
+                            data = {
+                                'chromosome': primer_data[key].chromosome,
+                                'start': cg, 
+                                'end': cg+1, 
+                                'methylation_percentage': 0,
+                                'count_methylated': 0, 
+                                'count_unmethylated': 0,
+                                'seq_pos': 0,
+                                'depth': 0,
+                                'basecall': 0,
+                            }
+                            missing_data.append(data)
+                    
+                    missing_df = pd.DataFrame(missing_data)
+                    #print(missing_df)
+                    combined_df = pd.concat([cg_only_df, missing_df], ignore_index=True)
+                    combined_df.sort_values(by=['start'], inplace=True, ignore_index=True,)
+
+                    #print(f'{key} has {len(cg_pos)} CGs')
+                    #print(combined_df)
+
+                    target_data = {
+                        'primer':key,
+                        'positions':combined_df.loc[:,'start'].to_list(),
+                        'methylation':combined_df.loc[:,'methylation_percentage'].to_list(),
+                        'depth':combined_df.loc[:,'depth'].to_list(),
+                    }
+
+                else: 
+                    target_data = {
                     'primer':key,
                     'positions':region_data[key].loc[:,'start'].to_list(),
                     'methylation':region_data[key].loc[:,'methylation_percentage'].to_list(),
                     'depth':region_data[key].loc[:,'depth'].to_list(),
                 }
-                if cg_flag:
-                    #Include only CG positions if 
-                    cg_pos = primer_data[key].cg_pos
 
-                    only_cg_pos = []
-                    only_methyl_pos = []
-                    only_depth_pos = []
-
-                    #Check each position if it's a CG.
-                    #Append data if it is. 
-                    for index, pos in enumerate(target_data['positions']): 
-                        #Conditional allows checking of BPX and BNX primers (C or G)
-                        if (pos in cg_pos) or (pos+1 in cg_pos): 
-                            only_cg_pos.append(pos)
-                            only_methyl_pos.append(target_data['methylation'][index])
-                            only_depth_pos.append(target_data['depth'][index])
-                        else:
-                            print(f'{pos} not found.')
-
-                    target_data['positions'] = only_cg_pos
-                    target_data['methylation'] = only_methyl_pos
-                    target_data['depth'] = only_depth_pos
                 try: 
                     #Calculating relative coverage
                     max_depth = max(target_data['depth'])
@@ -277,6 +301,7 @@ class MethylCallData():
 
         region_data = _prep_region_data(self.region_data, cg_flag, primer_data)
 
+        #Plot parameters
         num_primers= len(primer_data)
         height, width = _get_fig_size(num_primers)
         fig, axs = pyplot.subplots(height, width, figsize=(8.5,11))
@@ -306,20 +331,24 @@ class MethylCallData():
                             colour = 'wheat'
                         else: 
                             colour = 'lightskyblue'
-
+                        
+                        #Plot the methylation data
                         axs[i][j].bar(
-                            range(len(methyl_data)),
+                            range(1, len(methyl_data)+1),
                             methyl_data, 
-                            width=1,
+                            width=0.9,
                             align='center',
                             color=colour,
                         )
+                        #Line plot of relative depth
                         axs[i][j].plot(
+                            range(1, len(methyl_data)+1),
                             region_data[region_index]['relative_depth'],
                             'red'
                             )
+                        #Write maximum depth of target site
                         axs[i][j].text(
-                            0,
+                            1,
                             3,
                             f'max(depth)={str(max_depth)}',
                             fontsize='x-small',
@@ -340,8 +369,12 @@ class MethylCallData():
                             verticalalignment='center',  
                         )
                     axs[i][j].set(
+                        xlim=[0.5,len(methyl_data)+0.5],
                         ylim=[0,100],
                         title=f'{primer}',
+                    )
+                    axs[i][j].set_xticks(
+                        (1, len(methyl_data))
                     )
                     axs[i][j].set_yticks(
                         (0, 50.0, 100.0),
@@ -353,11 +386,12 @@ class MethylCallData():
                     pass
                 region_index = region_index + 1
         
-        pyplot.tight_layout()
+        #Plot formatting and output
+        #pyplot.tight_layout()
         fig_output_path = output_path.joinpath(f'{self.sample_id}.png')
         fig.subplots_adjust(top=0.94)
         fig.suptitle(self.sample_id)
-        #pyplot.tight_layout()
+        pyplot.tight_layout()
 
         fig.savefig(fig_output_path, transparent=False, dpi=300)
 
@@ -411,8 +445,8 @@ def import_primer_data(path: pathlib.Path) -> dict():
             cg_locations = []
 
             for cg in cg_iter:
-                #1-based index - should only have the C positions
-                cg_locations.append(cg.start()+int(primer[1])+1)
+                #0-based index - should only have the C positions
+                cg_locations.append(cg.start()+int(primer[1]))
             
                 primer_data[primer[3]] = Primer(
                     primer[0],

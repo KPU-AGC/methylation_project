@@ -235,7 +235,7 @@ class MethylCallData():
 
             """
 
-            target_sites = []
+            target_sites = {}
             for key in region_data: 
                 if cg_flag: 
                     cg_pos = primer_data[key].cg_pos
@@ -295,7 +295,7 @@ class MethylCallData():
                     target_data['relative_depth'] = [(depth/max_depth)*100 for depth in target_data['depth']]
                 except ValueError: 
                     print('No data')
-                target_sites.append(target_data)
+                target_sites[key] = target_data
 
             return target_sites
 
@@ -306,14 +306,19 @@ class MethylCallData():
         height, width = _get_fig_size(num_primers)
         fig, axs = pyplot.subplots(height, width, figsize=(8.5,11))
 
+        primers = sorted(list(primer_data.keys()))
+
         region_index = 0
 
         for i in range(height): 
             for j in range(width): 
-                if region_index < num_primers: 
-                    primer = region_data[region_index]['primer']
+                
+                primer = primers[region_index]
+
+                #Methylation data available
+                if primer in region_data: 
                     #pos_data = region_data[region_index]['positions']
-                    methyl_data = region_data[region_index]['methylation']
+                    methyl_data = region_data[primer]['methylation']
                     #cg_pos = primer_data[primer]['cg_pos']
 
                     if methyl_data: 
@@ -322,7 +327,7 @@ class MethylCallData():
                         #Yellow = 30-70%
                         #Blue = Unmethylated, <30%
                         
-                        max_depth = max(region_data[region_index]['depth'])
+                        max_depth = max(region_data[primer]['depth'])
 
                         mean_methylation = mean(methyl_data)
                         if mean_methylation >= 70.0: 
@@ -343,7 +348,7 @@ class MethylCallData():
                         #Line plot of relative depth
                         axs[i][j].plot(
                             range(1, len(methyl_data)+1),
-                            region_data[region_index]['relative_depth'],
+                            region_data[primer]['relative_depth'],
                             'red'
                             )
                         #Write maximum depth of target site
@@ -353,37 +358,50 @@ class MethylCallData():
                             f'max(depth)={str(max_depth)}',
                             fontsize='x-small',
                         )
-                    
-                    else: 
-                        axs[i][j].bar(
-                            0,
-                            0,
-                            width=1,
-                            align='edge',
+                        #Formatting
+                        #Set axis dimensions, plot title
+                        axs[i][j].set(
+                            xlim=[0.5,len(methyl_data)+0.5],
+                            ylim=[0,100],
+                            title=f'{primer}',
                         )
-                        axs[i][j].text(
-                            0.5,
-                            50,
-                            'No data',
-                            horizontalalignment='center',
-                            verticalalignment='center',  
+                        #Set axis labels and ticks
+                        axs[i][j].set_xticks(
+                            (1, len(methyl_data))
                         )
+
+                #No data case; just write an empty plot with no data.     
+                else: 
+                    axs[i][j].bar(
+                        0,
+                        0,
+                        width=1,
+                        align='edge',
+                    )
                     axs[i][j].set(
-                        xlim=[0.5,len(methyl_data)+0.5],
+                        xlim=[0,1],
                         ylim=[0,100],
                         title=f'{primer}',
                     )
                     axs[i][j].set_xticks(
-                        (1, len(methyl_data))
+                        (0, 1)
                     )
-                    axs[i][j].set_yticks(
-                        (0, 50.0, 100.0),
+                    axs[i][j].text(
+                        0.5,
+                        50,
+                        'No data',
+                        horizontalalignment='center',
+                        verticalalignment='center',  
                     )
-                    axs[i][j].set_yticklabels(
-                        ('0%', '50%', '100%')
-                    )
-                else: 
-                    pass
+
+                #Formatting for y-axis
+                axs[i][j].set_yticks(
+                    (0, 50.0, 100.0),
+                )
+                axs[i][j].set_yticklabels(
+                    ('0%', '50%', '100%')
+                )
+
                 region_index = region_index + 1
         
         #Plot formatting and output
@@ -397,6 +415,8 @@ class MethylCallData():
 
         if show_fig_flag: 
             pyplot.show()
+        
+        pyplot.close()
 
     def export_csv(self, primer_path: pathlib.Path, summary_path: pathlib.Path) -> None: 
         """"""

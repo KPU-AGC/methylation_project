@@ -168,7 +168,7 @@ while IFS= read -r prefix; do
         $mapped/"$prefix"_1_bismark_bt2_pe.bam
 done < $data/ngs_samplelist.txt
 
-#STEP 6: METHYLATION EXTRACTION - 
+#STEP 6: METHYLATION EXTRACTION - SNPSplit
 snpsplit_extract=$bismark/snpsplit_methylation_extraction
 all_snpsplit_extract=$snpsplit_extract/all_sequences
 filtered_snpsplit_extract=$snpsplit_extract/nonCG_filtered

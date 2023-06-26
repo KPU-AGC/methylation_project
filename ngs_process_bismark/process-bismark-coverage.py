@@ -80,6 +80,7 @@ class MethylCallData():
         primer_dfs : dict
             Key is the primer set, retuns data from target region of primer set.
         """
+
         def _get_summary_data(df: dict) -> list: 
             """Generate summary data for each primer set."""
             
@@ -117,6 +118,7 @@ class MethylCallData():
 
         def _get_off_target_df(primers: dict, df: pd.DataFrame) -> pd.DataFrame: 
             '''Figure out what other sequences remain.'''
+
             off_target_df = df
             #print(off_target_df)
             for primer in primers.values(): 
@@ -214,6 +216,7 @@ class MethylCallData():
         """
 
         def _get_fig_size(num_primers: int) -> int: 
+            """Determine the number of rows needed for the figure."""
             fig_height = ceil(num_primers/3)
             return fig_height, 3
 
@@ -231,7 +234,16 @@ class MethylCallData():
             -------
             target_sites : list
                 List of dictionaries where each dictionary is one target site, and has the plotted
-                information.
+                information. The four keys are as follows: 
+                
+                primer : str - name of region that the data is for 
+                positions : list - each element corresponds to a genomic coordinates of the called position.
+                methylation : list - each element corresponds to the % methylation of the called position.
+                depth : list - each element corresponds to the read depth of the called position.
+                
+                Additionally, the only CGs included are the ones that are present in the
+                reference genome. Any CG position with 0 data is retained so that the CG numbering 
+                matches between samples.
 
             """
 
@@ -299,6 +311,8 @@ class MethylCallData():
 
             return target_sites
 
+        #Prepare region data for figure generation.
+        #This 
         region_data = _prep_region_data(self.region_data, cg_flag, primer_data)
 
         #Plot parameters
@@ -419,7 +433,7 @@ class MethylCallData():
         pyplot.close()
 
     def export_csv(self, primer_path: pathlib.Path, summary_path: pathlib.Path) -> None: 
-        """"""
+        """Export the summary CSV files. """
         
         #Output primer DataFrames
         for primer in self.region_data: 
@@ -536,14 +550,11 @@ def parse_args():
 def main(): 
     args = parse_args()
 
-    #NOTE:
-    #THE PRIMER FILE HAS COORDINATES IN 0-BASED, HALF-OPEN. 
-    #THE COVERAGE REPORT IS IN 1-BASED, FULLY-CLOSED.
-    #THEREFORE, TO MAINTAIN CONSISTENCY IN MATH, WE WILL CONVERT THE COVERAGE REPORT
-    #COORDINATES TO 0-BASED AS WELL. 
     primer_data = import_primer_data(args.primer_path)
 
-    if args.coverage_path.is_dir(): 
+    #Handle passing a directory versus a single file
+    if args.coverage_path.is_dir():
+        #Setting up path list, output directory
         coverage_paths = get_coverage_paths(args.coverage_path)
 
         summary_dir = args.output_path.joinpath('summaries')
@@ -554,6 +565,7 @@ def main():
         figure_dir.mkdir(exist_ok=True)
 
         for coverage_path in coverage_paths: 
+            #Block handles SNPSplit results
             if args.snp_flag: 
                 sample_name = coverage_path.stem.split('_')[0]
                 #Check for genome assignment
@@ -571,6 +583,7 @@ def main():
             else: 
                 mcd = MethylCallData(coverage_path)
             
+            #Methylation calling, figure generation
             mcd.process_methylation_call_data(primer_data)
             mcd.generate_figure(primer_data, figure_dir, args.cg_flag)
             mcd.export_csv(primer_dir, summary_dir)

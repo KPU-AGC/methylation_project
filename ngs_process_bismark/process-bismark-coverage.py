@@ -80,6 +80,7 @@ class MethylCallData():
         primer_dfs : dict
             Key is the primer set, retuns data from target region of primer set.
         """
+
         def _get_summary_data(df: dict) -> list: 
             """Generate summary data for each primer set."""
             
@@ -117,6 +118,7 @@ class MethylCallData():
 
         def _get_off_target_df(primers: dict, df: pd.DataFrame) -> pd.DataFrame: 
             '''Figure out what other sequences remain.'''
+
             off_target_df = df
             #print(off_target_df)
             for primer in primers.values(): 
@@ -145,8 +147,10 @@ class MethylCallData():
                 & (methylation_df.end <= int(primer.end))
             ].copy(deep=True)
 
+            #NOTE: this will almost never be true now
             if region_df.empty:
                 print(f'No data for {primer.primer}')
+
             else:
                 #For each CG position, get the position relative to the sequence file 
                 # in 0-based coordinate, then store in dataframe.
@@ -214,6 +218,7 @@ class MethylCallData():
         """
 
         def _get_fig_size(num_primers: int) -> int: 
+            """Determine the number of rows needed for the figure."""
             fig_height = ceil(num_primers/3)
             return fig_height, 3
 
@@ -231,18 +236,35 @@ class MethylCallData():
             -------
             target_sites : list
                 List of dictionaries where each dictionary is one target site, and has the plotted
-                information.
+                information. The four keys are as follows: 
+                
+                primer : str - name of region that the data is for 
+                positions : list - each element corresponds to a genomic coordinates of the called position.
+                methylation : list - each element corresponds to the % methylation of the called position.
+                depth : list - each element corresponds to the read depth of the called position.
+                
+                Additionally, the only CGs included are the ones that are present in the
+                reference genome. Any CG position with 0 data is retained so that the CG numbering 
+                matches between samples.
 
             """
 
             target_sites = {}
+
+            #Iterate through dictionary keys (primers)
             for key in region_data: 
+
+                #CASE 1: empty dataframe 
+                if region_data[key].empty:
+                    continue
+
+                #CASE 2: If there's data and flag is set, get only CG positions
                 if cg_flag: 
                     cg_pos = primer_data[key].cg_pos
 
                     #Check for orientation. 
                     primer_suffix = key.split('-')[1]
-                    if 'BN' in primer_suffix: 
+                    if ('BN' in primer_suffix) or ('BSN' in primer_suffix): 
                         cg_pos = [pos + 1 for pos in cg_pos]
                     
                     #Slice out only rows that are CG positions
@@ -281,6 +303,7 @@ class MethylCallData():
                         'depth':combined_df.loc[:,'depth'].to_list(),
                     }
 
+                #CASE 3: If there's data and flag isn't set, get all positions
                 else: 
                     target_data = {
                     'primer':key,
@@ -289,16 +312,19 @@ class MethylCallData():
                     'depth':region_data[key].loc[:,'depth'].to_list(),
                 }
 
+                #This should be safe as long as there is data...
                 try: 
                     #Calculating relative coverage
                     max_depth = max(target_data['depth'])
                     target_data['relative_depth'] = [(depth/max_depth)*100 for depth in target_data['depth']]
-                except ValueError: 
-                    print('No data')
+                except ZeroDivisionError: 
+                    print(f'Zero division error for {target_data["primer"]}')
                 target_sites[key] = target_data
 
             return target_sites
 
+        #Prepare region data for figure generation.
+        #This 
         region_data = _prep_region_data(self.region_data, cg_flag, primer_data)
 
         #Plot parameters
@@ -310,99 +336,100 @@ class MethylCallData():
 
         region_index = 0
 
+        #NEEDS REFACTOR
         for i in range(height): 
             for j in range(width): 
-                
-                primer = primers[region_index]
+                if region_index < len(primers):
+                    primer = primers[region_index]
 
-                #Methylation data available
-                if primer in region_data: 
-                    #pos_data = region_data[region_index]['positions']
-                    methyl_data = region_data[primer]['methylation']
-                    #cg_pos = primer_data[primer]['cg_pos']
+                    #Methylation data available
+                    if primer in region_data: 
+                        #pos_data = region_data[region_index]['positions']
+                        methyl_data = region_data[primer]['methylation']
+                        #cg_pos = primer_data[primer]['cg_pos']
 
-                    if methyl_data: 
-                        #Assign colours - mean methylation
-                        #Green = Methylated, >70%
-                        #Yellow = 30-70%
-                        #Blue = Unmethylated, <30%
-                        
-                        max_depth = max(region_data[primer]['depth'])
+                        if methyl_data: 
+                            #Assign colours - mean methylation
+                            #Green = Methylated, >70%
+                            #Yellow = 30-70%
+                            #Blue = Unmethylated, <30%
+                            
+                            max_depth = max(region_data[primer]['depth'])
 
-                        mean_methylation = mean(methyl_data)
-                        if mean_methylation >= 70.0: 
-                            colour = 'forestgreen'
-                        elif  30 < mean_methylation < 70.0: 
-                            colour = 'wheat'
-                        else: 
-                            colour = 'lightskyblue'
-                        
-                        #Plot the methylation data
-                        axs[i][j].bar(
-                            range(1, len(methyl_data)+1),
-                            methyl_data, 
-                            width=0.9,
-                            align='center',
-                            color=colour,
-                        )
-                        #Line plot of relative depth
-                        axs[i][j].plot(
-                            range(1, len(methyl_data)+1),
-                            region_data[primer]['relative_depth'],
-                            'red'
+                            mean_methylation = mean(methyl_data)
+                            if mean_methylation >= 70.0: 
+                                colour = 'forestgreen'
+                            elif  30 < mean_methylation < 70.0: 
+                                colour = 'wheat'
+                            else: 
+                                colour = 'lightskyblue'
+                            
+                            #Plot the methylation data
+                            axs[i][j].bar(
+                                range(1, len(methyl_data)+1),
+                                methyl_data, 
+                                width=0.9,
+                                align='center',
+                                color=colour,
                             )
-                        #Write maximum depth of target site
-                        axs[i][j].text(
-                            1,
-                            3,
-                            f'max(depth)={str(max_depth)}',
-                            fontsize='x-small',
+                            #Line plot of relative depth
+                            axs[i][j].plot(
+                                range(1, len(methyl_data)+1),
+                                region_data[primer]['relative_depth'],
+                                'red'
+                                )
+                            #Write maximum depth of target site
+                            axs[i][j].text(
+                                1,
+                                3,
+                                f'max(depth)={str(max_depth)}',
+                                fontsize='x-small',
+                            )
+                            #Formatting
+                            #Set axis dimensions, plot title
+                            axs[i][j].set(
+                                xlim=[0.5,len(methyl_data)+0.5],
+                                ylim=[0,100],
+                                title=f'{primer}',
+                            )
+                            #Set axis labels and ticks
+                            axs[i][j].set_xticks(
+                                (1, len(methyl_data))
+                            )
+
+                    #No data case; just write an empty plot with no data.     
+                    else: 
+                        axs[i][j].bar(
+                            0,
+                            0,
+                            width=1,
+                            align='edge',
                         )
-                        #Formatting
-                        #Set axis dimensions, plot title
                         axs[i][j].set(
-                            xlim=[0.5,len(methyl_data)+0.5],
+                            xlim=[0,1],
                             ylim=[0,100],
                             title=f'{primer}',
                         )
-                        #Set axis labels and ticks
                         axs[i][j].set_xticks(
-                            (1, len(methyl_data))
+                            (0, 1)
+                        )
+                        axs[i][j].text(
+                            0.5,
+                            50,
+                            'No data',
+                            horizontalalignment='center',
+                            verticalalignment='center',  
                         )
 
-                #No data case; just write an empty plot with no data.     
-                else: 
-                    axs[i][j].bar(
-                        0,
-                        0,
-                        width=1,
-                        align='edge',
+                    #Formatting for y-axis
+                    axs[i][j].set_yticks(
+                        (0, 50.0, 100.0),
                     )
-                    axs[i][j].set(
-                        xlim=[0,1],
-                        ylim=[0,100],
-                        title=f'{primer}',
-                    )
-                    axs[i][j].set_xticks(
-                        (0, 1)
-                    )
-                    axs[i][j].text(
-                        0.5,
-                        50,
-                        'No data',
-                        horizontalalignment='center',
-                        verticalalignment='center',  
+                    axs[i][j].set_yticklabels(
+                        ('0%', '50%', '100%')
                     )
 
-                #Formatting for y-axis
-                axs[i][j].set_yticks(
-                    (0, 50.0, 100.0),
-                )
-                axs[i][j].set_yticklabels(
-                    ('0%', '50%', '100%')
-                )
-
-                region_index = region_index + 1
+                    region_index = region_index + 1
         
         #Plot formatting and output
         #pyplot.tight_layout()
@@ -419,7 +446,7 @@ class MethylCallData():
         pyplot.close()
 
     def export_csv(self, primer_path: pathlib.Path, summary_path: pathlib.Path) -> None: 
-        """"""
+        """Export the summary CSV files. """
         
         #Output primer DataFrames
         for primer in self.region_data: 
@@ -536,14 +563,11 @@ def parse_args():
 def main(): 
     args = parse_args()
 
-    #NOTE:
-    #THE PRIMER FILE HAS COORDINATES IN 0-BASED, HALF-OPEN. 
-    #THE COVERAGE REPORT IS IN 1-BASED, FULLY-CLOSED.
-    #THEREFORE, TO MAINTAIN CONSISTENCY IN MATH, WE WILL CONVERT THE COVERAGE REPORT
-    #COORDINATES TO 0-BASED AS WELL. 
     primer_data = import_primer_data(args.primer_path)
 
-    if args.coverage_path.is_dir(): 
+    #Handle passing a directory versus a single file
+    if args.coverage_path.is_dir():
+        #Setting up path list, output directory
         coverage_paths = get_coverage_paths(args.coverage_path)
 
         summary_dir = args.output_path.joinpath('summaries')
@@ -554,6 +578,7 @@ def main():
         figure_dir.mkdir(exist_ok=True)
 
         for coverage_path in coverage_paths: 
+            #Block handles SNPSplit results
             if args.snp_flag: 
                 sample_name = coverage_path.stem.split('_')[0]
                 #Check for genome assignment
@@ -571,6 +596,7 @@ def main():
             else: 
                 mcd = MethylCallData(coverage_path)
             
+            #Methylation calling, figure generation
             mcd.process_methylation_call_data(primer_data)
             mcd.generate_figure(primer_data, figure_dir, args.cg_flag)
             mcd.export_csv(primer_dir, summary_dir)

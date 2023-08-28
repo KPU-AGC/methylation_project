@@ -45,6 +45,7 @@ bisulfite_genome=$1
 
 #Get fastqc results for pre-trim files
 fastqc -t 16 -outdir $pre_trim_fastqc $data/*.fastq
+multiqc --outdir $pre_trim_fastqc $pre_trim_fastqc
 
 #Pipeline for getting the sample name prefixes
 #ls $data | grep fastq | sed s/_R1_001.fastq//g | sed s/_R2_001.fastq//g | sed s/_.*//g | sort | uniq > $data/ngs_samplelist.txt
@@ -66,7 +67,9 @@ while IFS= read -r prefix; do
         $trimmed/"$prefix"_un2.fastq \
         ILLUMINACLIP:$conda_env/adapters/TruSeq3-PE.fa:2:30:10:2:True LEADING:3 TRAILING:3 MINLEN:36 SLIDINGWINDOW:4:15
 done < $data/ngs_samplelist.txt
+
 fastqc -t 16 -outdir $post_trim_fastqc $trimmed/*.fastq
+multiqc --outdir $post_trim_fastqc $post_trim_fastqc
 
 #STEP 2: MAPPING
 #---------------
@@ -113,7 +116,7 @@ while IFS= read -r prefix; do
     bismark_methylation_extractor \
         --gzip \
         --bedGraph \
-        --cutoff 50 \
+        --zero_based \
         -p \
         --parallel 4 \
         -o $filtered_extracted \
@@ -124,7 +127,7 @@ while IFS= read -r prefix; do
     bismark_methylation_extractor \
         --gzip \
         --bedGraph \
-        --cutoff 50 \
+        --zero_based \
         -p \
         --parallel 4 \
         -o $all_extracted \

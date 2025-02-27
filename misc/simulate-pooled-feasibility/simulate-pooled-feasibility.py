@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+__description__ =\
+"""
+Purpose: To simulate bootstrap-based hierarchical read depth allocation for pooled-cells sequencing data.
+"""
+__author__ = "Erick Samera"
+__version__ = "1.0.0"
+__comments__ = "Works?"
+# --------------------------------------------------
 import numpy as np
 import pandas as pd
 from scipy.stats import nbinom, poisson, gamma
@@ -7,7 +15,7 @@ import logging
 import json
 import sys
 from typing import Tuple, Optional, List, Dict, Any
-
+# --------------------------------------------------
 def setup_logging(log_level: int = logging.INFO, log_file: Optional[str] = None) -> logging.Logger:
     """Setup logging to file and console with specified log level."""
     logger = logging.getLogger()
@@ -61,7 +69,7 @@ def simulate_sample_read_counts(sample_stats_file: str, trim_frac: float, debug:
             - p_nb (Optional[float]): Negative Binomial parameter p (if applicable).
     """
     try:
-        df = pd.read_csv(sample_stats_file, sep="\t", header=None, names=["file", "count"])
+        df = pd.read_pickle(sample_stats_file)
     except Exception as e:
         logging.error(f"Error reading sample stats file: {e}")
         sys.exit(1)
@@ -194,7 +202,7 @@ def simulate_bootstrap_min_depth_hierarchical(new_total_reads: int, cells_per_po
     region_props = None
     if region_props_file:
         try:
-            region_props = pd.read_csv(region_props_file, sep="\t", index_col=0)
+            region_props = pd.read_pickle(region_props_file)
         except Exception as e:
             logging.error(f"Error reading region properties file: {e}")
     
@@ -280,7 +288,7 @@ def simulate_bootstrap_detailed_stats(new_total_reads: int, cells_per_pool: List
     region_props = None
     if region_props_file:
         try:
-            region_props = pd.read_csv(region_props_file, sep="\t", index_col=0)
+            region_props = pd.read_pickle(region_props_file)
         except Exception as e:
             logging.error(f"Error reading region properties file: {e}")
     
@@ -394,7 +402,7 @@ def simulate_bootstrap_detailed_stats(new_total_reads: int, cells_per_pool: List
             })
     results_df = pd.DataFrame(results)
     return results_df
-
+# --------------------------------------------------
 def load_config(config_file: str) -> dict:
     """
     Load simulation parameters from a JSON configuration file.
@@ -412,28 +420,72 @@ def load_config(config_file: str) -> dict:
         logging.error(f"Error reading config file: {e}")
         sys.exit(1)
     return config
-
+# --------------------------------------------------
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Bootstrap-based hierarchical read depth allocation simulation for single-cell sequencing data.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument("--new_total_reads", type=int, default=50000000, help="Total number of reads to simulate.")
-    parser.add_argument("--cells_per_pool", type=str, default="80,80,80,80,80", help="Comma-separated list of cell counts per pool.")
-    parser.add_argument("--min_read_depth", type=int, default=15, help="Minimum read depth per cell for detection.")
-    parser.add_argument("--n_bootstrap", type=int, default=10000, help="Number of bootstrap iterations.")
-    parser.add_argument("--min_read_depth_frac", type=float, default=1.0, help="Fraction of cells that must meet min_read_depth.")
-    parser.add_argument("--sample_stats_file", type=str, default="pkl/reads-per-sample.pkl", help="Path to sample stats file.")
-    parser.add_argument("--region_props_file", type=str, default="pklreads-per-region.pkl", help="Path to region properties file.")
-    parser.add_argument("--trim_frac", type=float, default=0.05, help="Fraction to trim outliers in sample stats.")
-    parser.add_argument("--gamma_shape", type=float, default=2.0, help="Shape parameter for the Gamma distribution.")
-    parser.add_argument("--gamma_scale", type=float, default=1.0, help="Scale parameter for the Gamma distribution.")
-    parser.add_argument("--random_seed", type=int, default=42, help="Random seed for reproducibility.")
-    parser.add_argument("--debug", action="store_true", help="Enable debug logging.")
-    parser.add_argument("--log_file", type=str, default=None, help="File to write logs to.")
-    parser.add_argument("--config", type=str, default=None, help="Path to a JSON configuration file.")
-    parser.add_argument("--output_csv", type=str, default="simulation_detailed_stats.csv", help="Output CSV file for detailed stats.")
+        description=__description__,
+        epilog=f"v{__version__} : {__author__} | {__comments__}",
+        formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument("--new_total_reads",
+        type=int,
+        default=50000000,
+        help="Total number of reads to simulate.")
+    parser.add_argument("--cells_per_pool",
+        type=str,
+        default="80,80,80,80,80",
+        help="Comma-separated list of cell counts per pool.")
+    parser.add_argument("--min_read_depth",
+        type=int,
+        default=15,
+        help="Minimum read depth per cell for detection.")
+    parser.add_argument("--n_bootstrap",
+        type=int,
+        default=10000,
+        help="Number of bootstrap iterations.")
+    parser.add_argument("--min_read_depth_frac",
+        type=float,
+        default=1.0,
+        help="Fraction of cells that must meet min_read_depth.")
+    parser.add_argument("--sample_stats_file",
+        type=str,
+        default="pkl/reads-per-sample.pkl",
+        help="Path to sample stats file.")
+    parser.add_argument("--region_props_file",
+        type=str,
+        default="pkl/reads-per-region.pkl",
+        help="Path to region properties file.")
+    parser.add_argument("--trim_frac",
+        type=float,
+        default=0.05,
+        help="Fraction to trim outliers in sample stats.")
+    parser.add_argument("--gamma_shape",
+        type=float,
+        default=2.0,
+        help="Shape parameter for the Gamma distribution.")
+    parser.add_argument("--gamma_scale",
+        type=float,
+        default=1.0,
+        help="Scale parameter for the Gamma distribution.")
+    parser.add_argument("--random_seed",
+        type=int,
+        default=42,
+        help="Random seed for reproducibility.")
+    parser.add_argument("--debug",
+        action="store_true",
+        help="Enable debug logging.")
+    parser.add_argument("--log_file",
+        type=str,
+        default=None,
+        help="File to write logs to.")
+    parser.add_argument("--config",
+        type=str,
+        default=None,
+        help="Path to a JSON configuration file.")
+    parser.add_argument("--output_csv",
+        type=str,
+        default="simulation_detailed_stats.csv",
+        help="Output CSV file for detailed stats.")
     args = parser.parse_args()
 
     if args.config:
@@ -442,7 +494,7 @@ def parse_args() -> argparse.Namespace:
             setattr(args, key, value)
     args.cells_per_pool = [int(x.strip()) for x in args.cells_per_pool.split(",")]
     return args
-
+# --------------------------------------------------
 def main() -> None:
     """Main function to run the simulation."""
     args = parse_args()
@@ -472,7 +524,7 @@ def main() -> None:
         region_names = None
         if args.region_props_file:
             try:
-                region_props = pd.read_csv(args.region_props_file, sep="\t", index_col=0)
+                region_props = pd.read_pickle(args.region_props_file)
                 region_names = list(region_props.columns)
             except Exception as e:
                 logging.error(f"Error reading region properties file: {e}")
